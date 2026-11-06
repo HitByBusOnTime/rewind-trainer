@@ -94,6 +94,11 @@ namespace osu.Game.Rulesets.UI
         /// <param name="mod">The mod to be displayed</param>
         /// <param name="showTooltip">Whether a tooltip describing the mod should display on hover.</param>
         /// <param name="showExtendedInformation">Whether to display a mod's extended information, if available.</param>
+        /// <summary>
+        /// Mod icon artwork is drawn flush with the hexagon, so anything else has to be shrunk to fit inside it.
+        /// </summary>
+        public static float GetIconScale(IconUsage icon) => icon.Family == FontAwesome.Solid.Question.Family ? 0.62f : 1;
+
         public ModIcon(IMod mod, bool showTooltip = true, bool showExtendedInformation = true)
         {
             // May expand due to expanded content, so autosize here.
@@ -226,6 +231,7 @@ namespace osu.Game.Rulesets.UI
 
             modAcronym.Text = value.Acronym;
             modIcon.Icon = value.Icon ?? FontAwesome.Solid.Question;
+            modIcon.Scale = new Vector2(GetIconScale(modIcon.Icon));
             TooltipContent = showTooltip ? value as Mod : null;
 
             if (value.Icon == null)

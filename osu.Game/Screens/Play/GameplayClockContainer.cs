@@ -124,6 +124,21 @@ namespace osu.Game.Screens.Play
             StopGameplayClock();
         }
 
+        /// <summary>
+        /// Freezes the underlying clock without entering the paused state, so gameplay keeps updating
+        /// (and can be seeked frame by frame). Used by the Rewind on Miss mod.
+        /// </summary>
+        public void HoldClock() => GameplayClock.Stop();
+
+        /// <summary>
+        /// Releases a clock frozen via <see cref="HoldClock"/>.
+        /// </summary>
+        public void ReleaseClock()
+        {
+            if (!isPaused.Value)
+                GameplayClock.Start();
+        }
+
         protected virtual void StartGameplayClock()
         {
             Logger.Log($"{nameof(GameplayClockContainer)} started via call to {nameof(StartGameplayClock)}");

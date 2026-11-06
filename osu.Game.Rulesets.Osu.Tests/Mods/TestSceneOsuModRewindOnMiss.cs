@@ -1,0 +1,243 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.Collections.Generic;
+using NUnit.Framework;
+using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Types;
+using osu.Game.Rulesets.Osu.Mods;
+using osu.Game.Rulesets.Osu.Objects;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Utils;
+using osuTK;
+
+namespace osu.Game.Rulesets.Osu.Tests.Mods
+{
+    public partial class TestSceneOsuModRewindOnMiss : OsuModTestScene
+    {
+        private static Slider slider(double startTime)
+        {
+            var result = new Slider
+            {
+                StartTime = startTime,
+                Path = new SliderPath(PathType.LINEAR, new[] { Vector2.Zero, new Vector2(300, 0) }),
+            };
+
+            result.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
+            return result;
+        }
+
+        private static Spinner spinner(double startTime, double duration) => new Spinner { StartTime = startTime, Duration = duration };
+
+        [Test]
+        public void TestCircleInTheOpenRewindsExactDistance()
+        {
+            var objects = new HitObject[] { new HitCircle { StartTime = 5000 } };
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 5000, 2000), Is.EqualTo(3000));
+        }
+
+        [Test]
+        public void TestLandingInsideRealSliderMovesBeforeItsStart()
+        {
+            var earlier = slider(4000);
+            double end = earlier.GetEndTime();
+            Assert.That(end - earlier.StartTime, Is.GreaterThan(500), "slider too short for this test");
+
+            double circleTime = end + 500;
+            var objects = new HitObject[] { earlier, new HitCircle { StartTime = circleTime } };
+
+            // A distance which lands exactly halfway through the slider.
+            double rewindBy = circleTime - (earlier.StartTime + end) / 2;
+
+            // The slider's whole approach has to be ahead, which is longer than the minimum at this difficulty.
+            Assert.That(earlier.TimePreempt, Is.GreaterThan(1000));
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, circleTime, rewindBy), Is.EqualTo(4000 - earlier.TimePreempt));
+        }
+
+        [Test]
+        public void TestLandingInsideEarlierObjectGoesToItsStartEvenIfFurtherThanDistance()
+        {
+            // 8 s long, and 2 s before the missed circle is right in the middle of it.
+            var objects = new HitObject[] { spinner(2000, 8000), new HitCircle { StartTime = 10500 } };
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 10500, 2000), Is.EqualTo(1000));
+        }
+
+        [Test]
+        public void TestMissedTickRetriesWholeObject()
+        {
+            var objects = new HitObject[] { spinner(5000, 6000) };
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 9000, 2000), Is.EqualTo(3000));
+        }
+
+        [Test]
+        public void TestLandsInGapAfterPreviousObject()
+        {
+            // The gap is shorter than the full lead-in, but long enough to use.
+            var objects = new HitObject[] { spinner(1000, 3000), spinner(4600, 5000), new HitCircle { StartTime = 10000 } };
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 10000, 2000), Is.EqualTo(4200));
+        }
+
+        [Test]
+        public void TestChainedObjectsWithNoUsableGapAllRetry()
+        {
+            var objects = new HitObject[] { spinner(3000, 3000), spinner(6100, 3000), new HitCircle { StartTime = 9500 } };
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 9500, 2000), Is.EqualTo(2000));
+        }
+
+        [Test]
+        public void TestCircleAboutToBePressedGetsFullWarning()
+        {
+            // 2 s back lands 1 ms before this circle, which is the reported problem.
+            var objects = new HitObject[] { new HitCircle { StartTime = 3001 }, new HitCircle { StartTime = 5000 } };
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 5000, 2000), Is.EqualTo(2001));
+        }
+
+        [Test]
+        public void TestLandingJustAfterCircleGoesBeforeIt()
+        {
+            // 2 s back lands 50 ms after this circle. If it was hit late, that hit gets undone
+            // and the circle comes back with almost no time left, so retry it properly.
+            var objects = new HitObject[] { new HitCircle { StartTime = 2950 }, new HitCircle { StartTime = 5000 } };
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 5000, 2000), Is.EqualTo(1950));
+        }
+
+        [Test]
+        public void TestSlowApproachGetsAllOfIt()
+        {
+            var objects = new HitObject[] { new HitCircle { StartTime = 3500, TimePreempt = 1800 }, new HitCircle { StartTime = 5000 } };
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 5000, 2000), Is.EqualTo(1700));
+        }
+
+        [Test]
+        public void TestNearbyCircleWithEnoughTimeStaysExact()
+        {
+            var objects = new HitObject[] { new HitCircle { StartTime = 4000 }, new HitCircle { StartTime = 5000 } };
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 5000, 2000), Is.EqualTo(3000));
+        }
+
+        [Test]
+        public void TestLongStreamDoesNotGoBackToItsStart()
+        {
+            var objects = new List<HitObject>();
+
+            for (double t = 1000; t <= 20000; t += 100)
+                objects.Add(new HitCircle { StartTime = t });
+
+            double target = OsuModRewindOnMiss.GetRewindTarget(objects, 15000, 2000);
+
+            Assert.That(target, Is.LessThan(13000).And.GreaterThanOrEqualTo(6900));
+        }
+
+        [Test]
+        public void TestLandingJustBeforeObjectGetsLeadIn()
+        {
+            // Would land 100 ms before the spinner, too late to react.
+            var objects = new HitObject[] { spinner(3100, 1000), new HitCircle { StartTime = 5000 } };
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 5000, 2000), Is.EqualTo(2100));
+        }
+
+        private static JudgementResult resultOf(HitObject hitObject, HitResult type)
+            => new JudgementResult(hitObject, hitObject.CreateJudgement()) { Type = type };
+
+        [TestCase(HitResult.Great, false)]
+        [TestCase(HitResult.Ok, false)]
+        [TestCase(HitResult.Meh, false)]
+        [TestCase(HitResult.Miss, true)]
+        public void TestMissTriggers(HitResult type, bool expected)
+            => Assert.That(new OsuModRewindOnMiss().ShouldRewind(resultOf(new HitCircle(), type)), Is.EqualTo(expected));
+
+        [TestCase(HitResult.Great, false)]
+        [TestCase(HitResult.Ok, true)]
+        [TestCase(HitResult.Meh, true)]
+        [TestCase(HitResult.Miss, true)]
+        public void TestNotSSTriggers(HitResult type, bool expected)
+            => Assert.That(new OsuModRewindOnNotSS().ShouldRewind(resultOf(new HitCircle(), type)), Is.EqualTo(expected));
+
+        [Test]
+        public void TestNotSSOnSliderTicks()
+        {
+            var mod = new OsuModRewindOnNotSS();
+
+            Assert.That(mod.ShouldRewind(resultOf(new SliderTick(), HitResult.LargeTickHit)), Is.False);
+            Assert.That(mod.ShouldRewind(resultOf(new SliderTick(), HitResult.LargeTickMiss)), Is.True);
+        }
+
+        [Test]
+        public void TestNotSSIgnoresSpinnerBonus()
+        {
+            // Not getting bonus spins doesn't cost an SS.
+            Assert.That(new OsuModRewindOnNotSS().ShouldRewind(resultOf(new SpinnerBonusTick(), HitResult.IgnoreMiss)), Is.False);
+        }
+
+        [Test]
+        public void TestRewindModsAreMutuallyExclusive()
+            => Assert.That(ModUtils.CheckCompatibleSet(new Mod[] { new OsuModRewindOnMiss(), new OsuModRewindOnNotSS() }), Is.False);
+
+        [Test]
+        public void TestNotSSRewindsThenResumes()
+        {
+            bool sawPass = false, sawRewind = false;
+
+            CreateModTest(new ModTestData
+            {
+                Mod = new OsuModRewindOnNotSS(),
+                Autoplay = false,
+                CreateBeatmap = () => new Beatmap
+                {
+                    HitObjects = new List<HitObject>
+                    {
+                        new HitCircle { StartTime = 3000, Position = new Vector2(256, 192) },
+                    },
+                },
+                PassCondition = () =>
+                {
+                    double t = Player.GameplayClockContainer.CurrentTime;
+
+                    if (t > 3000)
+                        sawPass = true;
+                    if (sawPass && t < 2100)
+                        sawRewind = true;
+
+                    return sawRewind && t > 2400 && !Player.GameplayState.HasFailed;
+                },
+            });
+        }
+
+        [Test]
+        public void TestMissRewindsThenResumes()
+        {
+            bool sawMiss = false, sawRewind = false;
+
+            CreateModTest(new ModTestData
+            {
+                Mod = new OsuModRewindOnMiss(),
+                Autoplay = false, // no input at all -> the circle is missed
+                CreateBeatmap = () => new Beatmap
+                {
+                    HitObjects = new List<HitObject>
+                    {
+                        new HitCircle { StartTime = 3000, Position = new Vector2(256, 192) },
+                    },
+                },
+                PassCondition = () =>
+                {
+                    double t = Player.GameplayClockContainer.CurrentTime;
+
+                    if (!sawMiss && t > 3000)
+                        sawMiss = true;
+
+                    // missed at 3000 -> rewinds to 2000 (1 s before the circle)
+                    if (sawMiss && t < 2100)
+                        sawRewind = true;
+
+                    // then the music has to start moving forwards again, without failing
+                    return sawRewind && t > 2400 && !Player.GameplayState.HasFailed;
+                },
+            });
+        }
+    }
+}
