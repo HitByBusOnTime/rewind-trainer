@@ -18,7 +18,7 @@ The rewind distance, animation length and pause can be changed in each mod's set
 ## Install (Windows 64-bit)
 
 1. Download `RewindTrainer-win-x64.zip` from Releases and unzip it anywhere.
-2. Run `RewindTrainer.exe`. Windows may warn you because the program isn't signed.
+2. Open the folder and double-click `Rewind Trainer.exe`. Windows may warn you because the program isn't signed. Leave the `game` folder next to it.
 3. If you have osu!(lazer) on this computer, your settings, key bindings, skins, beatmaps and scores are copied across the first time you open it. Close osu! first. To add more later, drag `.osz` beatmap files and `.osk` skin files onto the window.
 
 Your data is kept in `%APPDATA%\rewind-trainer`. The first-time copy only reads your osu! folder and never changes it, your login isn't copied, and nothing leaves your computer. Beatmaps and skins are linked rather than duplicated, so they take almost no extra disk space. After that the two are separate: changes in one don't appear in the other.
@@ -36,15 +36,14 @@ Some interface text and game resources still mention osu!.
 You need the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 
 ```
-dotnet publish osu.Desktop -c Release -r win-x64 --self-contained true -o build
-dotnet run --project Tools/StripCommercialFonts -- build/osu.Game.Resources.dll
+powershell -ExecutionPolicy Bypass -File Tools/Package.ps1
 ```
 
-The second command is required if you share the build, because it removes the commercially licensed fonts. The mods are in `osu.Game.Rulesets.Osu/Mods/OsuModRewind.cs`.
+This makes the download next to the repository folder. Use it if you share a build, because it removes the commercially licensed fonts. The mods are in `osu.Game.Rulesets.Osu/Mods/OsuModRewind.cs`.
 
 ## Licences
 
-This software is free and must stay non-commercial, because it includes the game resources below.
+This software is free and must stay non-commercial, because it includes the game resources below. In the download, the licence files are in the `game` folder.
 
 | Part | Licence | Where |
 |---|---|---|
