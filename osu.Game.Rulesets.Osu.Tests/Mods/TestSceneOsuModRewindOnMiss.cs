@@ -56,9 +56,8 @@ namespace osu.Game.Rulesets.Osu.Tests.Mods
             // A distance which lands exactly halfway through the slider.
             double rewindBy = circleTime - (earlier.StartTime + end) / 2;
 
-            // The slider's whole approach has to be ahead, which is longer than the minimum at this difficulty.
-            Assert.That(earlier.TimePreempt, Is.GreaterThan(1000));
-            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, circleTime, rewindBy), Is.EqualTo(4000 - earlier.TimePreempt));
+            Assert.That(rewindBy, Is.GreaterThan(1000));
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, circleTime, rewindBy), Is.EqualTo(3000));
         }
 
         [Test]
@@ -109,11 +108,23 @@ namespace osu.Game.Rulesets.Osu.Tests.Mods
         }
 
         [Test]
-        public void TestSlowApproachGetsAllOfIt()
+        public void TestHalfSecondInTheOpenIsExact()
         {
-            var objects = new HitObject[] { new HitCircle { StartTime = 3500, TimePreempt = 1800 }, new HitCircle { StartTime = 5000 } };
-            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 5000, 2000), Is.EqualTo(1700));
+            var objects = new HitObject[] { new HitCircle { StartTime = 5000, TimePreempt = 1800 } };
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 5000, 500), Is.EqualTo(4500));
         }
+
+        [Test]
+        public void TestHalfSecondStillWarnsAboutNextCircle()
+        {
+            // Half a second back lands 100 ms before this circle, so it moves back to give half a second of warning.
+            var objects = new HitObject[] { new HitCircle { StartTime = 4600 }, new HitCircle { StartTime = 5000 } };
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 5000, 500), Is.EqualTo(4100));
+        }
+
+        [Test]
+        public void TestDefaultDistanceIsHalfASecond()
+            => Assert.That(new OsuModRewindOnMiss().RewindSeconds.Value, Is.EqualTo(0.5));
 
         [Test]
         public void TestNearbyCircleWithEnoughTimeStaysExact()
@@ -227,10 +238,10 @@ namespace osu.Game.Rulesets.Osu.Tests.Mods
 
                     if (t > 3000)
                         sawPass = true;
-                    if (sawPass && t < 2100)
+                    if (sawPass && t < 2600)
                         sawRewind = true;
 
-                    return sawRewind && t > 2400 && !Player.GameplayState.HasFailed;
+                    return sawRewind && t > 2800 && !Player.GameplayState.HasFailed;
                 },
             });
         }
@@ -259,11 +270,11 @@ namespace osu.Game.Rulesets.Osu.Tests.Mods
                     if (marks > 0 && t > 3000)
                         sawMark = true;
 
-                    if (sawMark && t < 2500)
+                    if (sawMark && t < 2600)
                         rewound = true;
 
                     // Before the circle comes around again, its miss has been undone, so nothing can still be waiting to show it.
-                    return rewound && t < 2800 && marks == 0;
+                    return rewound && t < 2900 && marks == 0;
                 },
             });
         }
@@ -291,12 +302,12 @@ namespace osu.Game.Rulesets.Osu.Tests.Mods
                     if (!sawMiss && t > 3000)
                         sawMiss = true;
 
-                    // missed at 3000 -> rewinds to 2000 (1 s before the circle)
-                    if (sawMiss && t < 2100)
+                    // missed at 3000 -> rewinds to 2500 (half a second before the circle)
+                    if (sawMiss && t < 2600)
                         sawRewind = true;
 
                     // then the music has to start moving forwards again, without failing
-                    return sawRewind && t > 2400 && !Player.GameplayState.HasFailed;
+                    return sawRewind && t > 2800 && !Player.GameplayState.HasFailed;
                 },
             });
         }

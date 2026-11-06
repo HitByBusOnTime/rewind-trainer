@@ -11,7 +11,7 @@ namespace osu.Game.Rulesets.Osu.Mods
     {
         public override string Name => "Rewind on Miss";
         public override string Acronym => "RW";
-        public override LocalisableString Description => "Rewinds 1 second before a miss.";
+        public override LocalisableString Description => "Rewinds half a second before a miss.";
 
         // Not only combo breaks: dropping the end of a slider is a miss which leaves the combo alone.
         // Bonus spins and the slider's own display-only result aren't things that can be missed.

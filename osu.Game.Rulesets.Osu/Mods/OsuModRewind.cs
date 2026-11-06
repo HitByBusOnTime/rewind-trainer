@@ -47,7 +47,7 @@ namespace osu.Game.Rulesets.Osu.Mods
         };
 
         [SettingSource("Rewind distance", "How many seconds before the missed object to rewind to.")]
-        public BindableDouble RewindSeconds { get; } = new BindableDouble(1)
+        public BindableDouble RewindSeconds { get; } = new BindableDouble(0.5)
         {
             MinValue = 0.5,
             MaxValue = 5,
@@ -83,9 +83,9 @@ namespace osu.Game.Rulesets.Osu.Mods
         }
 
         /// <summary>
-        /// The least warning the next object gets after a rewind, when its approach is shorter than this.
+        /// The most warning the next object is promised after a rewind. Otherwise it gets the rewind distance.
         /// </summary>
-        private const double min_warning = 1000;
+        private const double max_warning = 1000;
 
         /// <summary>
         /// Lands this long after the previous object at the very least. An object hit late has its result
@@ -94,13 +94,13 @@ namespace osu.Game.Rulesets.Osu.Mods
         private const double late_hit_margin = 200;
 
         /// <summary>
-        /// How much further back than the rewind distance to look for a place giving the next object its full approach.
+        /// How much further back than the rewind distance to look for a place giving the next object its warning.
         /// </summary>
         private const double max_extra_search = 6000;
 
         /// <summary>
         /// Finds where to rewind to: <paramref name="rewindBy"/> before the missed object, moved further back
-        /// if needed so that the next object has its whole approach ahead of it, and never inside a slider or spinner.
+        /// if needed so that the next object isn't about to be hit, and never inside a slider or spinner.
         /// </summary>
         /// <param name="objects">The beatmap's top-level objects.</param>
         /// <param name="missedTime">The start time of the object that was missed, which may be a tick inside a slider.</param>
@@ -143,7 +143,7 @@ namespace osu.Game.Rulesets.Osu.Mods
                 if (best != null && objectStart < target - max_extra_search)
                     break;
 
-                double needed = Math.Max((sorted[i] as OsuHitObject)?.TimePreempt ?? 0, min_warning);
+                double needed = Math.Min(rewindBy, max_warning);
 
                 // In non-stop streams there's no room for the margin, so settle for the middle of the gap.
                 double landing = earliest < objectStart

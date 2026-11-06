@@ -11,7 +11,7 @@ namespace osu.Game.Rulesets.Osu.Mods
     {
         public override string Name => "Rewind on Not SS";
         public override string Acronym => "RS";
-        public override LocalisableString Description => "Rewinds 1 second before anything that isn't perfect.";
+        public override LocalisableString Description => "Rewinds half a second before anything that isn't perfect.";
 
         // The same rule as the Perfect mod ("SS or quit"), so this triggers on exactly what would cost an SS.
         public override bool ShouldRewind(JudgementResult result)
