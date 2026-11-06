@@ -55,7 +55,7 @@ namespace osu.Game.Rulesets.Osu.Mods
         };
 
         [SettingSource("Rewind animation length", "How many seconds the visible rewind takes.")]
-        public BindableDouble AnimationSeconds { get; } = new BindableDouble(1)
+        public BindableDouble AnimationSeconds { get; } = new BindableDouble(0.5)
         {
             MinValue = 0.25,
             MaxValue = 3,
@@ -88,15 +88,31 @@ namespace osu.Game.Rulesets.Osu.Mods
         private const double max_warning = 1000;
 
         /// <summary>
-        /// Lands this long after the previous object at the very least. An object hit late has its result
+        /// Lands this long after the previous slider or spinner at the very least, or an unknown object. An object hit late has its result
         /// undone by landing before that hit, which brings it back with almost no time left to press it.
         /// </summary>
         private const double late_hit_margin = 200;
 
         /// <summary>
-        /// How much further back than the rewind distance to look for a place giving the next object its warning.
+        /// How much further back than the rewind distance to look when nothing usable has been found.
         /// </summary>
         private const double max_extra_search = 6000;
+
+        /// <summary>
+        /// How much further back to look for more warning when what's been found is already usable.
+        /// A pause in the map a few seconds back shouldn't pull every rewind back to it.
+        /// </summary>
+        private const double near_extra_search = 1000;
+
+        /// <summary>
+        /// The least warning which counts as usable for a circle. There's a pause to aim in before play resumes.
+        /// </summary>
+        private const double usable_circle_warning = 50;
+
+        /// <summary>
+        /// The least warning which counts as usable for a slider or spinner.
+        /// </summary>
+        private const double usable_long_object_warning = 400;
 
         /// <summary>
         /// Finds where to rewind to: <paramref name="rewindBy"/> before the missed object, moved further back
@@ -129,18 +145,24 @@ namespace osu.Game.Rulesets.Osu.Mods
 
             double? best = null;
             double bestWarning = 0;
+            bool bestIsUsable = false;
 
             // Latest first, looking at each gap between objects for the one closest to the target which fits.
             for (int i = sorted.Count - 1; i >= 0; i--)
             {
-                double earliest = previousEnd[i] + late_hit_margin;
+                // A circle can only be hit as late as its hit window, which is often much less than the general margin.
+                double margin = i > 0 && sorted[i - 1] is HitCircle { HitWindows: not null } previousCircle
+                    ? previousCircle.HitWindows.WindowFor(HitResult.Meh) + 10
+                    : late_hit_margin;
+
+                double earliest = previousEnd[i] + margin;
 
                 if (earliest > target)
                     continue;
 
                 double objectStart = sorted[i].StartTime;
 
-                if (best != null && objectStart < target - max_extra_search)
+                if (best != null && objectStart < target - (bestIsUsable ? near_extra_search : max_extra_search))
                     break;
 
                 double needed = Math.Min(rewindBy, max_warning);
@@ -161,6 +183,7 @@ namespace osu.Game.Rulesets.Osu.Mods
                 {
                     best = landing;
                     bestWarning = warning;
+                    bestIsUsable = warning >= (sorted[i].GetEndTime() > objectStart ? usable_long_object_warning : usable_circle_warning);
                 }
             }
 

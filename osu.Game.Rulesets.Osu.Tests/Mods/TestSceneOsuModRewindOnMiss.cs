@@ -122,6 +122,25 @@ namespace osu.Game.Rulesets.Osu.Tests.Mods
             Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 5000, 500), Is.EqualTo(4100));
         }
 
+        [TestCase(333)] // beats at 180 bpm
+        [TestCase(250)] // half beats at 120 bpm
+        public void TestPauseSecondsBackDoesNotPullTheRewindThere(int spacing)
+        {
+            // A busy section with a pause in the map 4 seconds before the miss.
+            var objects = new List<HitObject>();
+
+            for (double t = 1000; t < 6000; t += spacing)
+                objects.Add(new HitCircle { StartTime = t });
+
+            for (double t = 8000; t <= 20000; t += spacing)
+                objects.Add(new HitCircle { StartTime = t });
+
+            double missed = objects.Last(o => o.StartTime <= 12000).StartTime;
+            double target = OsuModRewindOnMiss.GetRewindTarget(objects, missed, 500);
+
+            Assert.That(missed - target, Is.LessThanOrEqualTo(2000));
+        }
+
         [Test]
         public void TestDefaultDistanceIsHalfASecond()
             => Assert.That(new OsuModRewindOnMiss().RewindSeconds.Value, Is.EqualTo(0.5));
