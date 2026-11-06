@@ -1,5 +1,12 @@
 # Rewind Trainer
 
+## ⬇️ [Click here to download the game](https://github.com/HitByBusOnTime/rewind-trainer/releases/latest/download/RewindTrainer-win-x64.zip)
+
+Unzip it and double-click `Rewind Trainer.exe`. **Don't use "Source code" or the green "Code" button.** Those are only the code, with no game in them.
+
+---
+
+
 An unofficial, offline rhythm game practice build with two extra mods. It is a modified version of the open-source osu!(lazer) client.
 
 **This project is not made by, affiliated with or endorsed by ppy Pty Ltd or osu!.** "osu!" and "ppy" are trademarks of their owners, and are only used here to say what this software is based on. Please don't report problems with this build to the osu! team.
@@ -17,7 +24,7 @@ The rewind distance, animation length and pause can be changed in each mod's set
 
 ## Install (Windows 64-bit)
 
-1. Download `RewindTrainer-win-x64.zip` from Releases and unzip it anywhere.
+1. Download the game with the link at the top of this page and unzip it anywhere.
 2. Open the folder and double-click `Rewind Trainer.exe`. Windows may warn you because the program isn't signed. Leave the `game` folder next to it.
 3. If you have osu!(lazer) on this computer, your settings, key bindings, skins, beatmaps and scores are copied across the first time you open it. Close osu! first. To add more later, drag `.osz` beatmap files and `.osk` skin files onto the window.
 
