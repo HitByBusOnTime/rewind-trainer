@@ -1,20 +1,23 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
+using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System;
+using SDL;
+using Velopack;
 using osu.Desktop.LegacyIpc;
 using osu.Desktop.Windows;
-using osu.Framework;
 using osu.Framework.Development;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
-using osu.Game;
+using osu.Framework;
+using osu.Game.IO;
 using osu.Game.IPC;
 using osu.Game.Tournament;
-using SDL;
-using Velopack;
+using osu.Game;
 
 namespace osu.Desktop
 {
@@ -110,6 +113,9 @@ namespace osu.Desktop
                 FriendlyGameName = OsuGameBase.GAME_NAME,
             };
 
+            if (!tournamentClient)
+                importExistingData(gameName);
+
             using (DesktopGameHost host = Host.GetSuitableDesktopHost(gameName, hostOptions))
             {
                 if (!host.IsPrimaryInstance)
@@ -151,6 +157,56 @@ namespace osu.Desktop
                 }
             }
         }
+
+        /// <summary>
+        /// Brings settings, skins and maps across from a normal install the first time this game runs.
+        /// This must never stop the game from starting, and never writes to the normal install.
+        /// </summary>
+        private static void importExistingData(string gameName)
+        {
+            try
+            {
+                string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                string source = Path.Combine(appData, @"osu");
+                string destination = Path.Combine(appData, gameName);
+
+                if (!ExistingDataImporter.ShouldImport(source, destination))
+                    return;
+
+                // The normal game's database can't be copied safely while it's open.
+                while (Process.GetProcessesByName(@"osu!").Length > 0)
+                {
+                    const int retry = 4;
+                    const uint retry_cancel_and_info = 0x5 | 0x40;
+
+                    int choice = OperatingSystem.IsWindows()
+                        ? MessageBoxW(IntPtr.Zero, "Rewind Trainer can copy your settings, skins and maps from osu!, but osu! is open.\n\nClose osu! and press Retry, or press Cancel to start with nothing copied.",
+                            OsuGameBase.GAME_NAME, retry_cancel_and_info)
+                        : 0;
+
+                    if (choice != retry)
+                        return;
+                }
+
+                ExistingDataImporter.Import(source, destination);
+            }
+            catch (Exception e)
+            {
+                try
+                {
+                    string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                    Directory.CreateDirectory(Path.Combine(appData, gameName));
+                    File.WriteAllText(Path.Combine(appData, gameName, @"import-error.txt"), e.ToString());
+                }
+                catch
+                {
+                    // nothing more can be done, and starting the game matters more.
+                }
+            }
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
 
         private static bool trySendIPCMessage(IIpcHost host, string cwd, string[] args)
         {

@@ -19,9 +19,9 @@ The rewind distance, animation length and pause can be changed in each mod's set
 
 1. Download `RewindTrainer-win-x64.zip` from Releases and unzip it anywhere.
 2. Run `RewindTrainer.exe`. Windows may warn you because the program isn't signed.
-3. Drag `.osz` beatmap files and `.osk` skin files onto the window to import them.
+3. If you have osu!(lazer) on this computer, your settings, key bindings, skins, beatmaps and scores are copied across the first time you open it. Close osu! first. To add more later, drag `.osz` beatmap files and `.osk` skin files onto the window.
 
-Your data is kept in `%APPDATA%\rewind-trainer`, apart from any normal osu! install, so maps have to be imported separately. Normal osu! isn't touched.
+Your data is kept in `%APPDATA%\rewind-trainer`. The first-time copy only reads your osu! folder and never changes it, your login isn't copied, and nothing leaves your computer. Beatmaps and skins are linked rather than duplicated, so they take almost no extra disk space. After that the two are separate: changes in one don't appear in the other.
 
 ## What this build leaves out
 
