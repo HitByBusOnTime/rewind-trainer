@@ -1,0 +1,5 @@
+<Project>
+  <!-- Replaces Sentry's target of the same name, which records the build computer's project folder inside each game file.
+       This build doesn't report errors, so nothing reads it. -->
+  <Target Name="WriteSentryAttributes" />
+</Project>
