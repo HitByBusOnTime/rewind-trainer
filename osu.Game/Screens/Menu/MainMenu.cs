@@ -331,6 +331,9 @@ namespace osu.Game.Screens.Menu
         {
             if (loginDisplayed.Value) return;
 
+            // Rewind Trainer has nothing to log in to, so don't ask.
+            if (api is OfflineAPIAccess) return;
+
             if (!api.IsLoggedIn || api.State.Value == APIState.RequiresSecondFactorAuth)
             {
                 Scheduler.AddDelayed(() => login?.Show(), 500);
