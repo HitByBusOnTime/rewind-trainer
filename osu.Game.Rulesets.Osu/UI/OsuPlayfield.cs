@@ -88,6 +88,7 @@ namespace osu.Game.Rulesets.Osu.UI
             }, onJudgementLoaded));
 
             NewResult += onNewResult;
+            RevertResult += onRevertResult;
         }
 
         private IHitPolicy hitPolicy;
@@ -205,6 +206,10 @@ namespace osu.Game.Rulesets.Osu.UI
             // ensure that ordering is consistent with expectations (latest judgement should be front-most).
             judgementAboveHitObjectLayer.ChangeChildDepth(explosion.ProxiedAboveHitObjectsContent, (float)-result.TimeAbsolute);
         }
+
+        // Otherwise an undone result's mark waits to play when time reaches it again, even if the object is hit this time.
+        // A later result only replaces it if that result has a mark of its own, which hits on slider ends and ticks don't.
+        private void onRevertResult(JudgementResult result) => judgementLayer.RemoveAll(j => j.Result == result, false);
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) => HitObjectContainer.ReceivePositionalInputAt(screenSpacePos);
 

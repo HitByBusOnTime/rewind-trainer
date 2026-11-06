@@ -2,7 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Judgements;
@@ -11,6 +13,7 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Osu.Objects;
+using osu.Game.Rulesets.Osu.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Utils;
 using osuTK;
@@ -157,6 +160,31 @@ namespace osu.Game.Rulesets.Osu.Tests.Mods
         public void TestNotSSTriggers(HitResult type, bool expected)
             => Assert.That(new OsuModRewindOnNotSS().ShouldRewind(resultOf(new HitCircle(), type)), Is.EqualTo(expected));
 
+        private static IEnumerable<object[]> sliderResults()
+        {
+            var slider = new Slider();
+
+            yield return new object[] { "head miss", new SliderHeadCircle(), HitResult.Miss, true };
+            yield return new object[] { "head hit", new SliderHeadCircle(), HitResult.Great, false };
+            yield return new object[] { "tick miss", new SliderTick(), HitResult.LargeTickMiss, true };
+            yield return new object[] { "repeat miss", new SliderRepeat(slider), HitResult.LargeTickMiss, true };
+            yield return new object[] { "end dropped", new SliderTailCircle(slider), HitResult.IgnoreMiss, true };
+            yield return new object[] { "end held", new SliderTailCircle(slider), HitResult.SliderTailHit, false };
+            yield return new object[] { "classic end dropped", new SliderTailCircle(slider) { ClassicSliderBehaviour = true }, HitResult.SmallTickMiss, true };
+            yield return new object[] { "classic slider missed", new Slider { ClassicSliderBehaviour = true }, HitResult.Miss, true };
+            yield return new object[] { "slider display result", new Slider(), HitResult.IgnoreMiss, false };
+            yield return new object[] { "spinner tick", new SpinnerTick(), HitResult.IgnoreMiss, false };
+            yield return new object[] { "spinner bonus", new SpinnerBonusTick(), HitResult.IgnoreMiss, false };
+        }
+
+        [TestCaseSource(nameof(sliderResults))]
+        public void TestMissOnSliderParts(string name, HitObject hitObject, HitResult type, bool expected)
+            => Assert.That(new OsuModRewindOnMiss().ShouldRewind(resultOf(hitObject, type)), Is.EqualTo(expected), name);
+
+        [TestCaseSource(nameof(sliderResults))]
+        public void TestNotSSOnSliderParts(string name, HitObject hitObject, HitResult type, bool expected)
+            => Assert.That(new OsuModRewindOnNotSS().ShouldRewind(resultOf(hitObject, type)), Is.EqualTo(expected), name);
+
         [Test]
         public void TestNotSSOnSliderTicks()
         {
@@ -203,6 +231,39 @@ namespace osu.Game.Rulesets.Osu.Tests.Mods
                         sawRewind = true;
 
                     return sawRewind && t > 2400 && !Player.GameplayState.HasFailed;
+                },
+            });
+        }
+
+        [Test]
+        public void TestRewoundMissLeavesNoMissMarkBehind()
+        {
+            bool sawMark = false, rewound = false;
+
+            CreateModTest(new ModTestData
+            {
+                Mod = new OsuModRewindOnMiss(),
+                Autoplay = false,
+                CreateBeatmap = () => new Beatmap
+                {
+                    HitObjects = new List<HitObject>
+                    {
+                        new HitCircle { StartTime = 3000, Position = new Vector2(256, 192) },
+                    },
+                },
+                PassCondition = () =>
+                {
+                    double t = Player.GameplayClockContainer.CurrentTime;
+                    int marks = Player.ChildrenOfType<DrawableOsuJudgement>().Count(j => j.JudgedHitObject != null);
+
+                    if (marks > 0 && t > 3000)
+                        sawMark = true;
+
+                    if (sawMark && t < 2500)
+                        rewound = true;
+
+                    // Before the circle comes around again, its miss has been undone, so nothing can still be waiting to show it.
+                    return rewound && t < 2800 && marks == 0;
                 },
             });
         }
