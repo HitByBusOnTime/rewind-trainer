@@ -1,147 +1,58 @@
-<p align="center">
-  <img width="500" alt="osu! logo" src="assets/lazer.png">
-</p>
+# Rewind Trainer
 
-# osu!
+An unofficial, offline rhythm game practice build with two extra mods. It is a modified version of the open-source osu!(lazer) client.
 
-[![Build status](https://github.com/ppy/osu/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/ppy/osu/actions/workflows/ci.yml)
-[![GitHub release](https://img.shields.io/github/release/ppy/osu.svg)](https://github.com/ppy/osu/releases/latest)
-[![CodeFactor](https://www.codefactor.io/repository/github/ppy/osu/badge)](https://www.codefactor.io/repository/github/ppy/osu)
-[![dev chat](https://discordapp.com/api/guilds/188630481301012481/widget.png?style=shield)](https://discord.gg/ppy)
-[![Crowdin](https://d322cqt584bo4o.cloudfront.net/osu-web/localized.svg)](https://crowdin.com/project/osu-web)
+**This project is not made by, affiliated with or endorsed by ppy Pty Ltd or osu!.** "osu!" and "ppy" are trademarks of their owners, and are only used here to say what this software is based on. Please don't report problems with this build to the osu! team.
 
-A free-to-win rhythm game. Rhythm is just a *click* away!
+## The mods
 
-This is the future – and final – iteration of the [osu!](https://osu.ppy.sh) game client which marks the beginning of an open era! Currently known by and released under the release codename "*lazer*". As in sharper than cutting-edge.
+Both are in the Difficulty Reduction column of the mod menu. Only one can be on at a time.
 
-## Status
+- **Rewind on Miss (RW):** a miss rewinds to 1 second before it.
+- **Rewind on Not SS (RS):** a 100, a 50, a miss or anything else that would cost an SS rewinds to 1 second before it.
 
-This project is under constant development, but we do our best to keep things in a stable state. Players are encouraged to install from a release alongside their stable *osu!* client. This project will continue to evolve until we eventually reach the point where most users prefer it over the previous "osu!stable" release.
+A rewind plays backwards, pauses briefly so you can place your cursor, then resumes with a flash. It never lands inside a slider or spinner, and the next object always gets its full approach, so a rewind can go back further than 1 second. In a non-stop stream it uses the biggest gap it can find, which can be short. You can't fail with these mods on.
 
-A few resources are available as starting points to getting involved and understanding the project:
+The rewind distance, animation length and pause can be changed in each mod's settings.
 
-- Detailed release changelogs are available on the [official osu! site](https://osu.ppy.sh/home/changelog/lazer).
-- You can learn more about our approach to [project management](https://github.com/ppy/osu/wiki/Project-management).
-- Track our current efforts [towards improving the game](https://github.com/orgs/ppy/projects/7/views/6).
+## Install (Windows 64-bit)
 
-## Running osu!
+1. Download `RewindTrainer-win-x64.zip` from Releases and unzip it anywhere.
+2. Run `RewindTrainer.exe`. Windows may warn you because the program isn't signed.
+3. Drag `.osz` beatmap files and `.osk` skin files onto the window to import them.
 
-If you are just looking to give the game a whirl, you can grab the latest release for your platform:
+Your data is kept in `%APPDATA%\rewind-trainer`, apart from any normal osu! install, so maps have to be imported separately. Normal osu! isn't touched.
 
-### Latest release:
+## What this build leaves out
 
-| [Windows 10+ (x64)](https://github.com/ppy/osu/releases/latest/download/install.exe) | macOS 12+ ([Intel](https://github.com/ppy/osu/releases/latest/download/osu.app.Intel.zip), [Apple Silicon](https://github.com/ppy/osu/releases/latest/download/osu.app.Apple.Silicon.zip)) | [Linux (x64)](https://github.com/ppy/osu/releases/latest/download/osu.AppImage) | [iOS 13.4+](https://osu.ppy.sh/home/testflight) | [Android 5+](https://github.com/ppy/osu/releases/latest/download/sh.ppy.osulazer.apk) |
-|--------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| ------------- | ------------- | ------------- |
+- **No online features.** It has no login, leaderboards, multiplayer, beatmap downloads, error reporting or updates, and it doesn't connect to the osu! servers. Scores are only saved on your computer. Parts of the interface still show these features, but they don't work.
+- **No new versions automatically.** Download new versions from Releases yourself.
+- **Different fonts.** Everything uses Inter, because the original Torus and Venera fonts need a commercial licence to distribute. The packaged build has them removed.
 
-You can also generally download a version for your current device from the [osu! site](https://osu.ppy.sh/home/download).
+Some interface text and game resources still mention osu!.
 
-If your platform is unsupported or not listed above, there is still a chance you can run the release or manually build it by following the instructions below.
+## Build from source
 
-**For iOS/iPadOS users**: The iOS testflight link fills up very fast (Apple has a hard limit of 10,000 users). We reset it occasionally. Please do not ask about this. Check back regularly for link resets or follow [peppy](https://twitter.com/ppy) on twitter for announcements. Our goal is to get the game on mobile app stores very soon so we don't have to live with this limitation.
-
-## Developing a custom ruleset
-
-osu! is designed to allow user-created gameplay variations, called "rulesets". Building one of these allows a developer to harness the power of the osu! beatmap library, game engine, and general UX for a new style of gameplay. To get started working on a ruleset, we have some templates available [here](https://github.com/ppy/osu/tree/master/Templates).
-
-You can see some examples of custom rulesets by visiting the [custom ruleset directory](https://github.com/ppy/osu/discussions/13096).
-
-## Developing osu!
-
-### Prerequisites
-
-Please make sure you have the following prerequisites:
-
-- A desktop platform with the correct [.NET SDK](https://dotnet.microsoft.com/download) installed.
-
-When working with the codebase, we recommend using an IDE with intelligent code completion and syntax highlighting, such as the latest version of [Visual Studio](https://visualstudio.microsoft.com/vs/), [JetBrains Rider](https://www.jetbrains.com/rider/), or [Visual Studio Code](https://code.visualstudio.com/) with the [EditorConfig](https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig) and [C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit) plugin installed.
-
-### Downloading the source code
-
-Clone the repository:
-
-```shell
-git clone https://github.com/ppy/osu
-cd osu
-```
-
-To update the source code to the latest commit, run the following command inside the `osu` directory:
-
-```shell
-git pull
-```
-
-### Building
-
-#### From an IDE
-
-You should load the solution via one of the platform-specific `.slnf` files, rather than the main `.sln`. This will reduce dependencies and hide platforms that you don't care about. Valid `.slnf` files are:
-
-- `osu.Desktop.slnf` (most common)
-- `osu.Android.slnf`
-- `osu.iOS.slnf`
-
-Run configurations for the recommended IDEs (listed above) are included. You should use the provided Build/Run functionality of your IDE to get things going. When testing or building new components, it's highly encouraged you use the `osu! (Tests)` project/configuration. More information on this is provided [below](#contributing).
-
-To build for mobile platforms, you will likely need to run `sudo dotnet workload restore` if you haven't done so previously. This will install Android/iOS tooling required to complete the build.
-
-#### From CLI
-
-You can also build and run *osu!* from the command-line with a single command:
-
-```shell
-dotnet run --project osu.Desktop
-```
-
-When running locally to do any kind of performance testing, make sure to add `-c Release` to the build command, as the overhead of running with the default `Debug` configuration can be large (especially when testing with local framework modifications as below).
-
-If the build fails, try to restore NuGet packages with `dotnet restore`.
-
-### Testing with resource/framework modifications
-
-Sometimes it may be necessary to cross-test changes in [osu-resources](https://github.com/ppy/osu-resources) or [osu-framework](https://github.com/ppy/osu-framework). This can be quickly achieved using included commands:
-
-Windows:
-
-```ps
-UseLocalFramework.ps1
-UseLocalResources.ps1
-```
-
-macOS / Linux:
-
-```ps
-UseLocalFramework.sh
-UseLocalResources.sh
-```
-
-Note that these commands assume you have the relevant project(s) checked out in adjacent directories:
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 
 ```
-|- osu            // this repository
-|- osu-framework
-|- osu-resources
+dotnet publish osu.Desktop -c Release -r win-x64 --self-contained true -o build
+dotnet run --project Tools/StripCommercialFonts -- build/osu.Game.Resources.dll
 ```
 
-### Code analysis
+The second command is required if you share the build, because it removes the commercially licensed fonts. The mods are in `osu.Game.Rulesets.Osu/Mods/OsuModRewind.cs`.
 
-Before committing your code, please run a code formatter. This can be achieved by running `dotnet format` in the command line, or using the `Format code` command in your IDE.
+## Licences
 
-We have adopted some cross-platform, compiler integrated analyzers. They can provide warnings when you are editing, building inside IDE or from command line, as-if they are provided by the compiler itself.
+This software is free and must stay non-commercial, because it includes the game resources below.
 
-JetBrains ReSharper InspectCode is also used for wider rule sets. You can run it from PowerShell with `.\InspectCode.ps1`. Alternatively, you can install ReSharper or use Rider to get inline support in your IDE of choice.
+| Part | Licence | Where |
+|---|---|---|
+| Code, based on [ppy/osu](https://github.com/ppy/osu) and [ppy/osu-framework](https://github.com/ppy/osu-framework) | MIT, Copyright (c) ppy Pty Ltd | `LICENCE` |
+| Game resources from [ppy/osu-resources](https://github.com/ppy/osu-resources), modified by removing fonts | CC BY-NC 4.0, Copyright (c) ppy Pty Ltd | `licences/osu-resources-CC-BY-NC-4.0.md` |
+| Inter font | SIL Open Font License 1.1, Copyright 2016-2019 The Inter Project Authors | `licences/Inter-OFL.txt` |
+| Noto font | Apache License 2.0 | `licences/Noto-LICENSE.txt` |
 
-## Contributing
+These changes were made to the original client: the two mods, online features turned off, a new name and logo, a changed intro and a font swap. The commit history has the details.
 
-When it comes to contributing to the project, the two main things you can do to help out are reporting issues and submitting pull requests. Please refer to the [contributing guidelines](CONTRIBUTING.md) to understand how to help in the most effective way possible.
-
-If you wish to help with localisation efforts, head over to [crowdin](https://crowdin.com/project/osu-web).
-
-Our team believes in **human contributions**. Any contribution – be it an issue report or a pull request – which is created by, documented by, or aided by AI/LLM usage will typically be **closed and locked without further discussion**.
-
-## Licence
-
-*osu!*'s code and framework are licensed under the [MIT licence](https://opensource.org/licenses/MIT). Please see [the licence file](LICENCE) for more information. [tl;dr](https://tldrlegal.com/license/mit-license) you can do whatever you want as long as you include the original copyright and license notice in any copy of the software/source.
-
-Please note that this *does not cover* the usage of the "osu!" or "ppy" branding in any software, resources, advertising or promotion, as this is protected by trademark law.
-
-Please also note that game resources are covered by a separate licence. Please see the [ppy/osu-resources](https://github.com/ppy/osu-resources) repository for clarifications.
+The software and resources come with no warranty, as described in their licences. Other libraries it uses are under their own licences, listed by their packages.

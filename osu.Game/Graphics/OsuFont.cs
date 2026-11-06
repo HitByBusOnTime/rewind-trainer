@@ -109,14 +109,15 @@ namespace osu.Game.Graphics
         {
             switch (typeface)
             {
+                // Rewind Trainer: Torus and Venera need a commercial licence to distribute, so everything uses Inter.
                 case Typeface.Venera:
-                    return @"Venera";
+                    return @"Inter";
 
                 case Typeface.Torus:
-                    return @"Torus";
+                    return @"Inter";
 
                 case Typeface.TorusAlternate:
-                    return @"Torus-Alternate";
+                    return @"Inter";
 
                 case Typeface.Inter:
                     return @"Inter";
@@ -133,6 +134,10 @@ namespace osu.Game.Graphics
         /// <returns>The string representation of <paramref name="weight"/> in the specified <paramref name="family"/>.</returns>
         public static string GetWeightString(string family, FontWeight weight)
         {
+            // Inter has no Black weight, which only Venera used.
+            if (weight == FontWeight.Black)
+                weight = FontWeight.Bold;
+
             if ((family == GetFamilyString(Typeface.Torus) || family == GetFamilyString(Typeface.TorusAlternate)) && weight == FontWeight.Medium)
                 // torus doesn't have a medium; fallback to regular.
                 weight = FontWeight.Regular;

@@ -39,25 +39,8 @@ namespace osu.Game.Screens
 
         private IntroScreen getIntroSequence()
         {
-            // Headless tests run too fast to load non-circles intros correctly.
-            // They will hit the "audio can't play" notification and cause random test failures.
-            if (SeasonalUIConfig.ENABLED && !DebugUtils.IsNUnitRunning)
-                return new IntroChristmas(createMainMenu);
-
-            if (introSequence == IntroSequence.Random)
-                introSequence = (IntroSequence)RNG.Next(0, (int)IntroSequence.Random);
-
-            switch (introSequence)
-            {
-                case IntroSequence.Circles:
-                    return new IntroCircles(createMainMenu);
-
-                case IntroSequence.Welcome:
-                    return new IntroWelcome(createMainMenu);
-
-                default:
-                    return new IntroTriangles(createMainMenu);
-            }
+            // The other intros show the original logo and name.
+            return new IntroCircles(createMainMenu);
 
             MainMenu createMainMenu() => new MainMenu();
         }

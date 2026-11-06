@@ -3,11 +3,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <OutputType>WinExe</OutputType>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Description>A free-to-win rhythm game. Rhythm is just a *click* away!</Description>
-    <AssemblyName>osu!</AssemblyName>
-    <AssemblyTitle>osu!(lazer)</AssemblyTitle>
-    <Title>osu!</Title>
-    <Product>osu!(lazer)</Product>
+    <Description>An unofficial offline practice build with rewind mods.</Description>
+    <AssemblyName>RewindTrainer</AssemblyName>
+    <AssemblyTitle>Rewind Trainer</AssemblyTitle>
+    <Title>Rewind Trainer</Title>
+    <Product>Rewind Trainer</Product>
     <ApplicationIcon>lazer.ico</ApplicationIcon>
     <Version>0.0.0</Version>
     <FileVersion>0.0.0</FileVersion>

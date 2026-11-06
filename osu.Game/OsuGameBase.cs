@@ -78,9 +78,9 @@ namespace osu.Game
     public partial class OsuGameBase : Framework.Game, ICanAcceptFiles, IBeatSyncProvider
     {
 #if DEBUG
-        public const string GAME_NAME = "osu! (development)";
+        public const string GAME_NAME = "Rewind Trainer (development)";
 #else
-        public const string GAME_NAME = "osu!";
+        public const string GAME_NAME = "Rewind Trainer";
 #endif
 
         public const string OSU_PROTOCOL = "osu://";
@@ -319,7 +319,7 @@ namespace osu.Game
 
             CurrentLanguage.BindValueChanged(val => frameworkLocale.Value = val.NewValue.ToCultureCode());
 
-            dependencies.CacheAs(API ??= new APIAccess(this, LocalConfig, endpoints, VersionHash));
+            dependencies.CacheAs(API ??= new OfflineAPIAccess());
 
             var defaultBeatmap = new DummyWorkingBeatmap(Audio, Textures);
 
@@ -381,6 +381,9 @@ namespace osu.Game
             base.Content.Add(LeaderboardManager);
 
             // add api components to hierarchy.
+            if (API is OfflineAPIAccess offlineApi)
+                base.Content.Add(offlineApi);
+
             if (API is APIAccess apiAccess)
                 base.Content.Add(apiAccess);
 
@@ -473,15 +476,7 @@ namespace osu.Game
 
         protected virtual void InitialiseFonts()
         {
-            AddFont(Resources, @"Fonts/Torus/Torus-Regular");
-            AddFont(Resources, @"Fonts/Torus/Torus-Light");
-            AddFont(Resources, @"Fonts/Torus/Torus-SemiBold");
-            AddFont(Resources, @"Fonts/Torus/Torus-Bold");
 
-            AddFont(Resources, @"Fonts/Torus-Alternate/Torus-Alternate-Regular");
-            AddFont(Resources, @"Fonts/Torus-Alternate/Torus-Alternate-Light");
-            AddFont(Resources, @"Fonts/Torus-Alternate/Torus-Alternate-SemiBold");
-            AddFont(Resources, @"Fonts/Torus-Alternate/Torus-Alternate-Bold");
 
             AddFont(Resources, @"Fonts/Inter/Inter-Regular");
             AddFont(Resources, @"Fonts/Inter/Inter-RegularItalic");
@@ -499,9 +494,6 @@ namespace osu.Game
             AddFont(Resources, @"Fonts/Noto/Noto-Hangul");
             AddFont(Resources, @"Fonts/Noto/Noto-Thai");
 
-            AddFont(Resources, @"Fonts/Venera/Venera-Light");
-            AddFont(Resources, @"Fonts/Venera/Venera-Bold");
-            AddFont(Resources, @"Fonts/Venera/Venera-Black");
 
             Fonts.AddStore(new OsuIcon.OsuIconStore(Textures));
         }

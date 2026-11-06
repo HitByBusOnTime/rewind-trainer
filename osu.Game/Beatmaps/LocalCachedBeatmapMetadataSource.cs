@@ -30,6 +30,8 @@ namespace osu.Game.Beatmaps
 
         private const string cache_database_name = @"online.db";
 
+        private static readonly bool offline_build = true;
+
         public LocalCachedBeatmapMetadataSource(Storage storage)
         {
             try
@@ -51,6 +53,10 @@ namespace osu.Game.Beatmaps
 
         private bool shouldFetchCache()
         {
+            // Rewind Trainer is offline, so the cache is never downloaded.
+            if (offline_build)
+                return false;
+
             // avoid downloading / using cache for unit tests.
             if (DebugUtils.IsNUnitRunning)
                 return false;
@@ -172,7 +178,7 @@ namespace osu.Game.Beatmaps
         {
             // This is guarded in the local call, but also included as a safety
             // for any incorrect public usage.
-            if (DebugUtils.IsNUnitRunning)
+            if (offline_build || DebugUtils.IsNUnitRunning)
                 return Task.CompletedTask;
 
             bool isRefetch = storage.Exists(cache_database_name);

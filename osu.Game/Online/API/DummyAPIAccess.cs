@@ -51,7 +51,7 @@ namespace osu.Game.Online.API
 
         public int APIVersion => int.Parse(DateTime.Now.ToString("yyyyMMdd"));
 
-        public Exception? LastLoginError { get; private set; }
+        public Exception? LastLoginError { get; protected set; }
 
         /// <summary>
         /// Provide handling logic for an arbitrary API request.
@@ -108,7 +108,7 @@ namespace osu.Game.Online.API
             return Task.CompletedTask;
         }
 
-        public void Login(string username, string password)
+        public virtual void Login(string username, string password)
         {
             state.Value = APIState.Connecting;
 
@@ -202,7 +202,7 @@ namespace osu.Game.Online.API
 
         public IChatClient GetChatClient() => new TestChatClientConnector(this);
 
-        public RegistrationRequest.RegistrationRequestErrors? CreateAccount(string email, string username, string password)
+        public virtual RegistrationRequest.RegistrationRequestErrors? CreateAccount(string email, string username, string password)
         {
             Thread.Sleep(200);
             return null;

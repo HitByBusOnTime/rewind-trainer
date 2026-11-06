@@ -24,7 +24,8 @@ namespace osu.Game.Screens.Menu
     {
         public double DelayBetweenRotation { get; set; } = 7500;
 
-        public bool FetchOnlineContent { get; set; } = true;
+        // Rewind Trainer is offline, so there's no banner content to fetch.
+        public bool FetchOnlineContent { get; set; }
 
         internal Bindable<APIMenuContent> Current { get; } = new Bindable<APIMenuContent>(new APIMenuContent());
 

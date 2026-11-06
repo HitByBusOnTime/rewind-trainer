@@ -21,9 +21,9 @@ namespace osu.Desktop
     public static class Program
     {
 #if DEBUG
-        private const string base_game_name = @"osu-development";
+        private const string base_game_name = @"rewind-trainer-development";
 #else
-        private const string base_game_name = @"osu";
+        private const string base_game_name = @"rewind-trainer";
 #endif
 
         private static LegacyTcpIpcProvider? legacyIpc;
@@ -37,6 +37,8 @@ namespace osu.Desktop
             // This has bitten us in the rear before (bricked updater), and although the underlying issue from
             // last time has been fixed, let's not tempt fate.
             setupVelopack(args);
+
+            Environment.SetEnvironmentVariable("OSU_DISABLE_ERROR_REPORTING", "1");
 
             if (OperatingSystem.IsWindows())
             {

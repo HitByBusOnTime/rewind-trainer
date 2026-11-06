@@ -23,18 +23,9 @@ namespace osu.Game.Screens.Menu
 
         private const double delay_for_menu = 2900;
 
-        private Sample welcome;
-
         public IntroCircles([CanBeNull] Func<MainMenu> createNextScreen = null)
             : base(createNextScreen)
         {
-        }
-
-        [BackgroundDependencyLoader]
-        private void load(AudioManager audio)
-        {
-            if (MenuVoice.Value)
-                welcome = audio.Samples.Get(@"Intro/welcome");
         }
 
         protected override void LogoArriving(OsuLogo logo, bool resuming)
@@ -43,8 +34,6 @@ namespace osu.Game.Screens.Menu
 
             if (!resuming)
             {
-                welcome?.Play();
-
                 Scheduler.AddDelayed(delegate
                 {
                     StartTrack();

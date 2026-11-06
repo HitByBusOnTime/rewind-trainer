@@ -107,21 +107,8 @@ namespace osu.Desktop
 
         public static bool IsPackageManaged => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OSU_EXTERNAL_UPDATE_PROVIDER"));
 
-        protected override UpdateManager CreateUpdateManager()
-        {
-            // If this is the first time we've run the game, ie it is being installed,
-            // reset the user's release stream specified by the installation target.
-            //
-            // This ensures that if a user is trying to recover from a failed startup, it will keep them
-            // on the stream which is imminently being reinstalled.
-            if (IsFirstRun)
-                LocalConfig.SetValue(OsuSetting.ReleaseStream, Version.Contains("-tachyon") ? ReleaseStream.Tachyon : ReleaseStream.Lazer);
-
-            if (IsPackageManaged)
-                return new NoActionUpdateManager();
-
-            return new VelopackUpdateManager();
-        }
+        // Rewind Trainer never checks for or installs updates.
+        protected override UpdateManager CreateUpdateManager() => new UpdateManager();
 
         public override bool RestartAppWhenExited()
         {
@@ -132,8 +119,6 @@ namespace osu.Desktop
         protected override void LoadComplete()
         {
             base.LoadComplete();
-
-            LoadComponentAsync(new DiscordRichPresence(), Add);
 
             switch (RuntimeInfo.OS)
             {
