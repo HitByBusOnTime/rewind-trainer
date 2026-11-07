@@ -1043,8 +1043,10 @@ namespace osu.Game.Screens.Play
         private HotkeyRetryOverlay retryOverlay;
         private HotkeyExitOverlay exitOverlay;
 
+        // Measured in real time, not song time: the rewind mods move song time backwards, so a song-time
+        // cooldown restarted with every rewind and Esc stopped working for as long as the rewinds kept coming.
         protected bool PauseCooldownActive =>
-            PlayingState.Value == LocalUserPlayingState.Playing && lastPauseActionTime.HasValue && GameplayClockContainer.CurrentTime < lastPauseActionTime + PauseCooldownDuration;
+            PlayingState.Value == LocalUserPlayingState.Playing && lastPauseActionTime.HasValue && Time.Current < lastPauseActionTime + PauseCooldownDuration;
 
         /// <summary>
         /// A set of conditionals which defines whether the current game state and configuration allows for
@@ -1082,7 +1084,7 @@ namespace osu.Game.Screens.Play
 
             GameplayClockContainer.Stop();
             PauseOverlay.Show();
-            lastPauseActionTime = GameplayClockContainer.CurrentTime;
+            lastPauseActionTime = Time.Current;
             return true;
         }
 
@@ -1103,6 +1105,9 @@ namespace osu.Game.Screens.Play
             {
                 GameplayClockContainer.Start();
                 IsResuming = false;
+
+                // the cooldown is for play after resuming, not time spent in the pause menu.
+                lastPauseActionTime = Time.Current;
             }
         }
 

@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Testing;
@@ -296,6 +297,56 @@ namespace osu.Game.Rulesets.Osu.Tests.Mods
                     return rewound && t < 2900 && marks == 0;
                 },
             });
+        }
+
+        [Test]
+        public void TestEscStillPausesInARewindLoop()
+        {
+            bool sawMiss = false, rewinding = false;
+            Stopwatch? sinceResume = null;
+
+            CreateModTest(new ModTestData
+            {
+                Mod = new OsuModRewindOnMiss(),
+                Autoplay = false, // no input -> misses the circle every time, so it rewinds forever
+                CreateBeatmap = () => new Beatmap
+                {
+                    HitObjects = new List<HitObject>
+                    {
+                        new HitCircle { StartTime = 3000, Position = new Vector2(256, 192) },
+                    },
+                },
+                // The steps below run before this is checked.
+                PassCondition = () => true,
+            });
+
+            AddUntilStep("missed, and rewinding", () =>
+            {
+                double t = Player.GameplayClockContainer.CurrentTime;
+
+                if (t > 3000)
+                    sawMiss = true;
+                if (sawMiss && t < 2900)
+                    rewinding = true;
+
+                return rewinding;
+            });
+            double pausedAt = 0;
+
+            AddAssert("can pause during the rewind", () =>
+            {
+                pausedAt = Player.GameplayClockContainer.CurrentTime;
+                return Player.Pause();
+            });
+            AddStep("resume", () =>
+            {
+                Player.GameplayClockContainer.Start();
+                sinceResume = Stopwatch.StartNew();
+            });
+            AddUntilStep("a real second has passed", () => sinceResume!.ElapsedMilliseconds > 1200);
+            // Rewinds keep song time from getting a second past the first pause, which is what used to block Esc.
+            AddAssert("song time still within a second of the first pause", () => Player.GameplayClockContainer.CurrentTime < pausedAt + 1000);
+            AddAssert("can pause again", () => Player.Pause());
         }
 
         [Test]
