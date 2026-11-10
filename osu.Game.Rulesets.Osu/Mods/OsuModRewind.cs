@@ -11,7 +11,10 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Input.Bindings;
+using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Framework.Testing;
 using osu.Framework.Timing;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
@@ -121,7 +124,18 @@ namespace osu.Game.Rulesets.Osu.Mods
         /// <param name="objects">The beatmap's top-level objects.</param>
         /// <param name="missedTime">The start time of the object that was missed, which may be a tick inside a slider.</param>
         /// <param name="rewindBy">The rewind distance.</param>
-        public static double GetRewindTarget(IEnumerable<HitObject> objects, double missedTime, double rewindBy)
+        /// <param name="earlierLandings">Where earlier rewinds in this play landed. A rewind never goes back past the latest one
+        /// of these which is still before it: those were already fine places to restart, and going further back than one feels random.</param>
+        public static double GetRewindTarget(IEnumerable<HitObject> objects, double missedTime, double rewindBy, IEnumerable<double>? earlierLandings = null)
+        {
+            double landing = findRewindTarget(objects, missedTime, rewindBy, out double ideal);
+
+            double latestEarlierLanding = earlierLandings?.Where(l => l <= ideal).DefaultIfEmpty(double.NegativeInfinity).Max() ?? double.NegativeInfinity;
+
+            return Math.Max(landing, latestEarlierLanding);
+        }
+
+        private static double findRewindTarget(IEnumerable<HitObject> objects, double missedTime, double rewindBy, out double ideal)
         {
             var sorted = objects.OrderBy(o => o.StartTime).ToList();
 
@@ -131,7 +145,7 @@ namespace osu.Game.Rulesets.Osu.Mods
                                        .DefaultIfEmpty(missedTime)
                                        .Min();
 
-            double target = missedStart - rewindBy;
+            double target = ideal = missedStart - rewindBy;
 
             // The end of everything before each object, so overlapping objects are never landed inside.
             double[] previousEnd = new double[sorted.Count];
@@ -195,7 +209,7 @@ namespace osu.Game.Rulesets.Osu.Mods
 
         public bool RestartOnFail => false;
 
-        private partial class RewindOverlay : CompositeDrawable
+        private partial class RewindOverlay : CompositeDrawable, IKeyBindingHandler<OsuAction>
         {
             private const double max_seek_lead = 200;
 
@@ -216,6 +230,7 @@ namespace osu.Game.Rulesets.Osu.Mods
             private GameplayClockContainer gameplayClock { get; set; } = null!;
 
             private Phase phase = Phase.Idle;
+            private readonly List<double> landings = new List<double>();
             private double fromTime;
             private double toTime;
             private double elapsed;
@@ -312,11 +327,12 @@ namespace osu.Game.Rulesets.Osu.Mods
                     return;
 
                 fromTime = gameplayClock.CurrentTime;
-                toTime = Math.Max(GetRewindTarget(drawableRuleset.Objects, Math.Min(result.HitObject.StartTime, fromTime), rewindBy), gameplayClock.StartTime);
+                toTime = Math.Max(GetRewindTarget(drawableRuleset.Objects, Math.Min(result.HitObject.StartTime, fromTime), rewindBy, landings), gameplayClock.StartTime);
 
                 if (toTime >= fromTime)
                     return;
 
+                landings.Add(toTime);
                 beginRewind();
             }
 
@@ -326,7 +342,6 @@ namespace osu.Game.Rulesets.Osu.Mods
                 elapsed = 0;
 
                 gameplayClock.HoldClock();
-                setInputs(false);
 
                 tint.ClearTransforms();
                 tint.FadeTo(0.18f, 150);
@@ -357,7 +372,6 @@ namespace osu.Game.Rulesets.Osu.Mods
             {
                 phase = Phase.Idle;
 
-                setInputs(true);
                 gameplayClock.ReleaseClock();
 
                 tint.FadeOut(250);
@@ -368,10 +382,23 @@ namespace osu.Game.Rulesets.Osu.Mods
                 ring.ResizeTo(110).FadeTo(1).ResizeTo(900, 500, Easing.OutQuint).FadeOut(500, Easing.OutQuint);
             }
 
-            private void setInputs(bool allow)
+            // Clicks are ignored during a rewind, so nothing gets hit while time stands still.
+            // They used to be switched off entirely instead. Clicking the orange circle to resume tells the game to ignore
+            // that same click when it arrives in gameplay; with clicks switched off it never arrived, so the game ignored
+            // the next real hit instead. The resuming click is let through here for the same reason.
+            public bool OnPressed(KeyBindingPressEvent<OsuAction> e)
             {
-                if (drawableRuleset is DrawableOsuRuleset osuRuleset)
-                    osuRuleset.KeyBindingInputManager.AllowGameplayInputs = allow;
+                if (phase == Phase.Idle || gameplayClock.IsPaused.Value || e.Action is not (OsuAction.LeftButton or OsuAction.RightButton))
+                    return false;
+
+                if (drawableRuleset.Playfield.ChildrenOfType<OsuResumeOverlay.OsuResumeOverlayInputBlocker>().Any(b => b.BlockNextPress))
+                    return false;
+
+                return true;
+            }
+
+            public void OnReleased(KeyBindingReleaseEvent<OsuAction> e)
+            {
             }
 
             protected override void Update()

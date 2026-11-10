@@ -5,7 +5,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Testing;
+using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Judgements;
@@ -15,9 +17,11 @@ using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Objects.Drawables;
+using osu.Game.Rulesets.Osu.UI;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Utils;
 using osuTK;
+using osuTK.Input;
 
 namespace osu.Game.Rulesets.Osu.Tests.Mods
 {
@@ -140,6 +144,59 @@ namespace osu.Game.Rulesets.Osu.Tests.Mods
             double target = OsuModRewindOnMiss.GetRewindTarget(objects, missed, 500);
 
             Assert.That(missed - target, Is.LessThanOrEqualTo(2000));
+        }
+
+        private static List<HitObject> hardPart()
+        {
+            // A pause, then a stream with no room to give the usual warning anywhere in it.
+            var objects = new List<HitObject>();
+
+            for (double t = 1000; t <= 3000; t += 500)
+                objects.Add(new HitCircle { StartTime = t });
+
+            for (double t = 5000; t <= 15000; t += 80)
+                objects.Add(new HitCircle { StartTime = t });
+
+            return objects;
+        }
+
+        [Test]
+        public void TestLaterMissDoesNotGoBackPastAnEarlierRewind()
+        {
+            var objects = hardPart();
+
+            // Without anything earlier, a miss late in the stream is pulled back to the pause before it.
+            double withoutEarlier = OsuModRewindOnMiss.GetRewindTarget(objects, 9000, 500);
+            Assert.That(withoutEarlier, Is.LessThan(5000));
+
+            // But a rewind earlier in the stream already landed at 7000, so it goes back no further than that.
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 9000, 500, new[] { 7000.0 }), Is.EqualTo(7000));
+        }
+
+        [Test]
+        public void TestEarlierRewindAfterTheMissIsIgnored()
+        {
+            var objects = hardPart();
+
+            // That landing is later than the miss, so it can't be where this rewind goes.
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 9000, 500, new[] { 12000.0 }),
+                Is.EqualTo(OsuModRewindOnMiss.GetRewindTarget(objects, 9000, 500)));
+        }
+
+        [Test]
+        public void TestMostRecentEarlierRewindIsUsed()
+        {
+            var objects = hardPart();
+
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 9000, 500, new[] { 5500.0, 7000.0, 6000.0 }), Is.EqualTo(7000));
+        }
+
+        [Test]
+        public void TestEarlierRewindDoesNotChangeANormalRewind()
+        {
+            var objects = new HitObject[] { new HitCircle { StartTime = 5000 } };
+
+            Assert.That(OsuModRewindOnMiss.GetRewindTarget(objects, 5000, 500, new[] { 2000.0 }), Is.EqualTo(4500));
         }
 
         [Test]
@@ -347,6 +404,77 @@ namespace osu.Game.Rulesets.Osu.Tests.Mods
             // Rewinds keep song time from getting a second past the first pause, which is what used to block Esc.
             AddAssert("song time still within a second of the first pause", () => Player.GameplayClockContainer.CurrentTime < pausedAt + 1000);
             AddAssert("can pause again", () => Player.Pause());
+        }
+
+        [Test]
+        public void TestHitAfterResumingFromAPauseInARewind()
+        {
+            bool sawMiss = false, rewinding = false;
+
+            CreateModTest(new ModTestData
+            {
+                Mod = new OsuModRewindOnMiss(),
+                Autoplay = false,
+                CreateBeatmap = () => new Beatmap
+                {
+                    HitObjects = new List<HitObject>
+                    {
+                        new HitCircle { StartTime = 3000, Position = new Vector2(256, 192) },
+                    },
+                },
+                // The steps below run before this is checked.
+                PassCondition = () => true,
+            });
+
+            AddUntilStep("missed, and rewinding", () =>
+            {
+                double t = Player.GameplayClockContainer.CurrentTime;
+
+                if (t > 3000)
+                    sawMiss = true;
+                if (sawMiss && t < 2900)
+                    rewinding = true;
+
+                return rewinding;
+            });
+
+            // The orange circle only appears when the cursor is over the playfield.
+            AddStep("cursor over the playfield", () => InputManager.MoveMouseTo(Player.DrawableRuleset.Playfield.ToScreenSpace(new Vector2(100, 100))));
+            AddStep("pause", () => Player.Pause());
+            AddStep("resume", () => Player.Resume());
+            AddUntilStep("orange circle shown", () => Player.ChildrenOfType<OsuResumeOverlay>().Single().State.Value == Visibility.Visible);
+            AddStep("point at the orange circle", () =>
+                InputManager.MoveMouseTo(Player.ChildrenOfType<OsuResumeOverlay.OsuClickToResumeCursor>().Single().ScreenSpaceDrawQuad.Centre + new Vector2(1)));
+            AddStep("click it", () =>
+            {
+                InputManager.PressKey(Key.Z);
+                InputManager.ReleaseKey(Key.Z);
+            });
+            AddUntilStep("playing again", () => !Player.GameplayClockContainer.IsPaused.Value);
+            AddAssert("game isn't waiting to ignore a press", () =>
+                !Player.ChildrenOfType<OsuResumeOverlay.OsuResumeOverlayInputBlocker>().Single().BlockNextPress);
+
+            AddStep("aim at the circle", () => InputManager.MoveMouseTo(Player.DrawableRuleset.Playfield.ToScreenSpace(new Vector2(256, 192))));
+
+            // Test steps only run every so often, too coarse to hit a circle on time, so check every frame instead.
+            ScheduledDelegate? hitter = null;
+            bool pressed = false;
+
+            AddStep("hit it when it's due", () => hitter = Scheduler.AddDelayed(() =>
+            {
+                double t = Player.GameplayClockContainer.CurrentTime;
+
+                if (pressed || !Player.GameplayClockContainer.IsRunning || t < 2990 || t > 3040)
+                    return;
+
+                pressed = true;
+                InputManager.PressKey(Key.Z);
+                InputManager.ReleaseKey(Key.Z);
+            }, 0, true));
+
+            AddUntilStep("pressed", () => pressed);
+            AddUntilStep("the hit counted", () => Player.ScoreProcessor.HitEvents.Any(e => e.Result.IsHit()));
+            AddStep("stop", () => hitter?.Cancel());
         }
 
         [Test]
