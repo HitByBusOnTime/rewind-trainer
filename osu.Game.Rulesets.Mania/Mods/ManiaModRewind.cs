@@ -24,9 +24,10 @@ namespace osu.Game.Rulesets.Mania.Mods
         protected static bool HoldBroken(JudgementResult result) => result.HitObject is HoldNoteBody && !result.IsHit;
 
         /// <summary>
-        /// The light under each column animates on game time. Letting go of a key as the song rewinds schedules its
-        /// "light off" at a moment the song has just gone back past, so the key stayed lit until that moment came round again.
-        /// Finish those for every key that isn't held, so the lights match what's actually pressed.
+        /// Lights animate on game time. Letting go of a key as the song rewinds schedules its "light off" at a moment
+        /// the song has just gone back past, so it stayed lit until that moment came round again.
+        /// This finishes those for the light under every key that isn't held, and for the glow classic-style skins add to the
+        /// column while a long note is held (no long note can be held at the moment a rewind lands or resumes).
         /// </summary>
         protected override void OnRewindSettled(DrawableRuleset<ManiaHitObject> drawableRuleset)
         {
@@ -35,6 +36,10 @@ namespace osu.Game.Rulesets.Mania.Mods
 
             foreach (var column in drawableRuleset.Playfield.ChildrenOfType<Column>())
             {
+                // Finishing a fade-out also removes the glow, so go through a copy.
+                foreach (var glow in column.TopLevelContainer.Children.ToList())
+                    glow.FinishTransforms(true);
+
                 if (held.Contains(column.Action.Value))
                     continue;
 

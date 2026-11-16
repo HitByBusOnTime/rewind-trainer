@@ -18,6 +18,9 @@ using osu.Game.Tests.Visual;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Rulesets.Mania.Skinning.Legacy;
+using osu.Game.Skinning;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.Objects.Drawables;
 using osuTK.Input;
@@ -103,9 +106,22 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
             Assert.That(new ManiaModRewindOnNotSS().ShouldRewind(resultOf(new HoldNoteBody(), HitResult.IgnoreHit)), Is.False);
         }
 
-        [Test]
-        public void TestLettingGoTooEarlyRewindsRightAway()
+        [Resolved]
+        private SkinManager skins { get; set; } = null!;
+
+        // Classic-style skins light up a held note with a glow added to the column, not the note.
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TestLettingGoTooEarlyRewindsRightAway(bool classicSkin)
         {
+            AddStep(classicSkin ? "classic skin" : "default skin", () =>
+            {
+                if (classicSkin)
+                    skins.CurrentSkinInfo.Value = skins.DefaultClassicSkin.SkinInfo;
+                else
+                    skins.CurrentSkinInfo.SetDefault();
+            });
+
             Key key = Key.Unknown;
             bool pressed = false, released = false, rewound = false;
             double furthest = 0;
@@ -179,7 +195,11 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
                 return waiting.Count == 0;
             });
 
+            AddAssert("no hold glow left on", () => !Player.DrawableRuleset.Playfield.ChildrenOfType<Column>()
+                                                            .Any(c => c.TopLevelContainer.Children.Any(d => d is HitTargetInsetContainer && d.Alpha > 0.01f)));
+
             AddStep("stop", () => player?.Cancel());
+            AddStep("back to the default skin", () => skins.CurrentSkinInfo.SetDefault());
         }
 
         [Test]
