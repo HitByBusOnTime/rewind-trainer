@@ -15,10 +15,12 @@ An unofficial, offline rhythm game practice build with two extra mods. It is a m
 
 Both are in the Difficulty Reduction column of the mod menu. Only one can be on at a time.
 
+They work in all four modes: osu!, osu!taiko, osu!catch and osu!mania. In each mode they follow that mode's own scoring, so bonuses like drumroll ticks, swells and bananas never rewind, and in catch tiny droplets only rewind with Rewind on Not SS.
+
 - **Rewind on Miss (RW):** a miss rewinds to half a second before it.
 - **Rewind on Not SS (RS):** a 100, a 50, a miss or anything else that would cost an SS rewinds to half a second before it.
 
-A rewind plays backwards, pauses briefly so you can place your cursor, then resumes with a flash. It never lands inside a slider or spinner, and the next object always gets some warning, so a rewind can go back further than half a second. In a non-stop stream it uses the biggest gap it can find, which can be short. You can't fail with these mods on.
+A rewind plays backwards, pauses briefly so you can place your cursor, then resumes with a flash. It never lands inside a slider, spinner, hold note or drumroll, and the next object always gets some warning, so a rewind can go back further than half a second. In a non-stop stream it uses the biggest gap it can find, which can be short. You can't fail with these mods on.
 
 The rewind distance, animation length and pause can be changed in each mod's settings.
 
