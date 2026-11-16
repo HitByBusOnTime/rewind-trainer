@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Input.Bindings;
@@ -17,6 +18,8 @@ using osu.Game.Tests.Visual;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.UI;
+using osu.Framework.Graphics;
+using osu.Game.Rulesets.Objects.Drawables;
 using osuTK.Input;
 
 namespace osu.Game.Rulesets.Mania.Tests.Mods
@@ -154,6 +157,28 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
 
             AddUntilStep("rewound", () => rewound);
             AddAssert("rewound right after letting go, not at the end of the note", () => furthest < 4000);
+
+            // Nothing is held now, so no key light should be left waiting to turn on or off at a moment the song rewound past.
+            // It lands half a second before the note, at 2500.
+            Stopwatch? sinceLanding = null;
+            AddUntilStep("landed", () => !Player.GameplayClockContainer.IsRunning && Player.DrawableRuleset.FrameStableClock.CurrentTime < 2525);
+            // The rewind finishes easing in just after this, then there's the get-ready pause, so check part way into that pause.
+            AddStep("start timing", () => sinceLanding = Stopwatch.StartNew());
+            AddUntilStep("into the get-ready pause", () => sinceLanding!.ElapsedMilliseconds > 300);
+            AddAssert("still paused before playing on", () => !Player.GameplayClockContainer.IsRunning);
+            AddAssert("no key light stuck from before the rewind", () =>
+            {
+                double now = Player.DrawableRuleset.FrameStableClock.CurrentTime;
+
+                var waiting = Player.DrawableRuleset.Playfield.ChildrenOfType<Column>()
+                                    .SelectMany(c => c.ChildrenOfType<Drawable>().Where(d => d is IKeyBindingHandler<ManiaAction> && d is not DrawableHitObject && d is not Column))
+                                    .SelectMany(a => a.ChildrenOfType<Drawable>().Prepend(a))
+                                    .SelectMany(d => d.Transforms.Where(t => t.StartTime > now + 1).Select(t => $"{d.GetType().Name}.{t.TargetMember} at {t.StartTime:N0}"))
+                                    .ToList();
+
+                return waiting.Count == 0;
+            });
+
             AddStep("stop", () => player?.Cancel());
         }
 

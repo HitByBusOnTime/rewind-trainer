@@ -248,10 +248,17 @@ namespace osu.Game.Rulesets.Mods
         /// </summary>
         protected virtual bool LetPressThrough(DrawableRuleset<TObject> drawableRuleset) => false;
 
+        /// <summary>
+        /// Called when a rewind lands and again when play resumes, to tidy up anything the trip back in time left behind.
+        /// </summary>
+        protected virtual void OnRewindSettled(DrawableRuleset<TObject> drawableRuleset)
+        {
+        }
+
         public void ApplyToDrawableRuleset(DrawableRuleset<TObject> drawableRuleset)
         {
             var overlay = new RewindOverlay<TObject, TAction>(drawableRuleset, ShouldRewind,
-                a => IgnoreDuringRewind(a), () => LetPressThrough(drawableRuleset),
+                a => IgnoreDuringRewind(a), () => LetPressThrough(drawableRuleset), () => OnRewindSettled(drawableRuleset),
                 RewindSeconds.Value * 1000, AnimationSeconds.Value * 1000, HoldSeconds.Value * 1000);
 
             drawableRuleset.Overlays.Add(overlay);
@@ -277,6 +284,7 @@ namespace osu.Game.Rulesets.Mods
         private readonly Func<JudgementResult, bool> shouldRewind;
         private readonly Func<TAction, bool> ignoreDuringRewind;
         private readonly Func<bool> letPressThrough;
+        private readonly Action settled;
         private readonly double rewindBy;
         private readonly double animationLength;
         private readonly double holdLength;
@@ -296,12 +304,13 @@ namespace osu.Game.Rulesets.Mods
         private CircularContainer ring = null!;
 
         public RewindOverlay(DrawableRuleset<TObject> drawableRuleset, Func<JudgementResult, bool> shouldRewind, Func<TAction, bool> ignoreDuringRewind,
-                             Func<bool> letPressThrough, double rewindBy, double animationLength, double holdLength)
+                             Func<bool> letPressThrough, Action settled, double rewindBy, double animationLength, double holdLength)
         {
             this.drawableRuleset = drawableRuleset;
             this.shouldRewind = shouldRewind;
             this.ignoreDuringRewind = ignoreDuringRewind;
             this.letPressThrough = letPressThrough;
+            this.settled = settled;
             this.rewindBy = rewindBy;
             this.animationLength = animationLength;
             this.holdLength = holdLength;
@@ -425,6 +434,8 @@ namespace osu.Game.Rulesets.Mods
             phase = Phase.Holding;
             elapsed = 0;
 
+            settled();
+
             banner.ClearTransforms();
             banner.FadeOut(100);
 
@@ -439,6 +450,7 @@ namespace osu.Game.Rulesets.Mods
         {
             phase = Phase.Idle;
 
+            settled();
             gameplayClock.ReleaseClock();
 
             tint.FadeOut(250);
