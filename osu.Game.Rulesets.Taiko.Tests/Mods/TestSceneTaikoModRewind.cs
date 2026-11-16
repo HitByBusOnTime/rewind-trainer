@@ -6,6 +6,7 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
@@ -83,6 +84,60 @@ namespace osu.Game.Rulesets.Taiko.Tests.Mods
                 Assert.That(new TaikoModRewindOnNotSS().ShouldRewind(resultOf(hitObject, HitResult.IgnoreMiss)), Is.False, hitObject.GetType().Name);
             }
         }
+
+        private static DrumRoll drumRoll()
+        {
+            var roll = new DrumRoll { StartTime = 3000, Duration = 1000 };
+            roll.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
+            return roll;
+        }
+
+        /// <summary>
+        /// Plays one pass of a drumroll's ticks, hitting the first <paramref name="hits"/> of them, and returns whether it rewound.
+        /// </summary>
+        private static bool playDrumRoll(TaikoModRewind mod, DrumRoll roll, int hits)
+        {
+            var ticks = roll.NestedHitObjects.OfType<DrumRollTick>().ToList();
+            bool rewound = false;
+
+            for (int i = 0; i < ticks.Count; i++)
+                rewound |= mod.ShouldRewind(resultOf(ticks[i], i < hits ? HitResult.SmallBonus : HitResult.IgnoreMiss));
+
+            return rewound;
+        }
+
+        [Test]
+        public void TestSkippedDrumRollRewinds()
+        {
+            var roll = drumRoll();
+            int ticks = roll.NestedHitObjects.OfType<DrumRollTick>().Count();
+            Assert.That(ticks, Is.GreaterThan(3));
+
+            Assert.That(playDrumRoll(new TaikoModRewindOnMiss(), roll, 0), Is.True, "none hit, on miss");
+            Assert.That(playDrumRoll(new TaikoModRewindOnNotSS(), roll, 0), Is.True, "none hit, not SS");
+            Assert.That(playDrumRoll(new TaikoModRewindOnMiss(), roll, ticks / 2 - 1), Is.True, "under half hit");
+            Assert.That(playDrumRoll(new TaikoModRewindOnMiss(), roll, (ticks + 1) / 2), Is.False, "half hit");
+            Assert.That(playDrumRoll(new TaikoModRewindOnMiss(), roll, ticks), Is.False, "all hit");
+        }
+
+        [Test]
+        public void TestDrumRollSettingOffNeverRewinds()
+            => Assert.That(playDrumRoll(new TaikoModRewindOnMiss { DrumRollTicksToHit = { Value = 0 } }, drumRoll(), 0), Is.False);
+
+        [Test]
+        public void TestRetriedDrumRollIsJudgedAfresh()
+        {
+            var mod = new TaikoModRewindOnMiss();
+            var roll = drumRoll();
+            int ticks = roll.NestedHitObjects.OfType<DrumRollTick>().Count();
+
+            Assert.That(playDrumRoll(mod, roll, 0), Is.True, "first try skipped");
+            Assert.That(playDrumRoll(mod, roll, ticks), Is.False, "second try all hit");
+            Assert.That(playDrumRoll(mod, roll, 0), Is.True, "third try skipped again");
+        }
+
+        [Test]
+        public void TestSkippedDrumRollRewindsInPlay() => createRewindTest(new TaikoModRewindOnMiss(), drumRoll(), false);
 
         [Test]
         public void TestMissRewindsThenResumes() => createRewindTest(new TaikoModRewindOnMiss(), new Hit { StartTime = 3000 }, true);

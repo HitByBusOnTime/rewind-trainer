@@ -3,13 +3,11 @@
 
 using osu.Framework.Localisation;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Catch.Objects;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Catch.Mods
 {
-    public class CatchModRewindOnMiss : ModRewind<CatchHitObject, CatchAction>
+    public class CatchModRewindOnMiss : CatchModRewind
     {
         public override string Name => "Rewind on Miss";
         public override string Acronym => "RW";

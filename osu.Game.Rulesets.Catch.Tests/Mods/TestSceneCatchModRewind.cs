@@ -13,6 +13,8 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 using osu.Game.Rulesets.Catch.Mods;
 using osu.Game.Rulesets.Catch.Objects;
+using osu.Game.Rulesets.Catch.UI;
+using osuTK.Input;
 
 namespace osu.Game.Rulesets.Catch.Tests.Mods
 {
@@ -83,6 +85,22 @@ namespace osu.Game.Rulesets.Catch.Tests.Mods
             // Bananas are a bonus.
             Assert.That(onMiss.ShouldRewind(resultOf(new Banana(), HitResult.IgnoreMiss)), Is.False, "banana, on miss");
             Assert.That(onNotSS.ShouldRewind(resultOf(new Banana(), HitResult.IgnoreMiss)), Is.False, "banana, not SS");
+        }
+
+        [Test]
+        public void TestMoveKeyHeldThroughARewindStillMoves()
+        {
+            float startX = 0;
+
+            createRewindTest(new CatchModRewindOnMiss(), new Fruit { StartTime = 3000, X = 0 }, false);
+
+            AddUntilStep("rewinding again", () => sawMiss && Player.GameplayClockContainer.CurrentTime > 3000);
+            AddUntilStep("back at the start of the rewind", () => Player.GameplayClockContainer.CurrentTime < 2600);
+            AddStep("press and hold left", () => InputManager.PressKey(Key.Left));
+            AddUntilStep("playing again", () => Player.GameplayClockContainer.IsRunning && Player.GameplayClockContainer.CurrentTime > 2550);
+            AddStep("note where the catcher is", () => startX = Player.ChildrenOfType<Catcher>().First().X);
+            AddUntilStep("the catcher moves left", () => Player.ChildrenOfType<Catcher>().First().X < startX - 20);
+            AddStep("let go", () => InputManager.ReleaseKey(Key.Left));
         }
 
         // Far to the side, away from where the catcher starts.

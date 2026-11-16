@@ -3,12 +3,10 @@
 
 using osu.Framework.Localisation;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Catch.Objects;
 
 namespace osu.Game.Rulesets.Catch.Mods
 {
-    public class CatchModRewindOnNotSS : ModRewind<CatchHitObject, CatchAction>
+    public class CatchModRewindOnNotSS : CatchModRewind
     {
         public override string Name => "Rewind on Not SS";
         public override string Acronym => "RS";

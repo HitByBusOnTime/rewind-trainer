@@ -3,17 +3,16 @@
 
 using osu.Framework.Localisation;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Taiko.Objects;
 
 namespace osu.Game.Rulesets.Taiko.Mods
 {
-    public class TaikoModRewindOnMiss : ModRewind<TaikoHitObject, TaikoAction>
+    public class TaikoModRewindOnMiss : TaikoModRewind
     {
         public override string Name => "Rewind on Miss";
         public override string Acronym => "RW";
         public override LocalisableString Description => "Rewinds half a second before a miss.";
 
-        public override bool ShouldRewind(JudgementResult result) => IsMiss(result);
+        // The drumroll check runs first: it keeps track of every tick.
+        public override bool ShouldRewind(JudgementResult result) => DrumRollWasSkipped(result) || IsMiss(result);
     }
 }
