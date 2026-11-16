@@ -1,10 +1,13 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Input.Bindings;
 using osu.Framework.Testing;
+using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Judgements;
@@ -14,6 +17,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 using osu.Game.Rulesets.Taiko.Mods;
 using osu.Game.Rulesets.Taiko.Objects;
+using osuTK.Input;
 
 namespace osu.Game.Rulesets.Taiko.Tests.Mods
 {
@@ -138,6 +142,98 @@ namespace osu.Game.Rulesets.Taiko.Tests.Mods
 
         [Test]
         public void TestSkippedDrumRollRewindsInPlay() => createRewindTest(new TaikoModRewindOnMiss(), drumRoll(), false);
+
+        [Test]
+        public void TestNoteRightAfterLandingDoesNotRewindAgain()
+        {
+            // A stream long and dense enough that the rewind has to land in it with almost no warning.
+            const double skipped = 10000;
+            var noteTimes = new List<double>();
+            for (double t = 1000; t <= 12000; t += 150)
+                noteTimes.Add(t);
+
+            Key key = Key.Unknown;
+            var pressed = new HashSet<double>();
+            bool rewoundOnce = false, resumed = false, done = false;
+            double highest = double.NegativeInfinity, landing = double.MaxValue, furthest = double.NegativeInfinity;
+            ScheduledDelegate? player = null;
+
+            CreateModTest(new ModTestData
+            {
+                // Slowed down so the test's per-frame presses land on every note: frames in a test can be far apart in song time.
+                Mods = new Mod[] { new TaikoModRewindOnMiss(), new TaikoModHalfTime { SpeedChange = { Value = 0.5 } } },
+                Autoplay = false,
+                CreateBeatmap = () => new Beatmap { HitObjects = noteTimes.Select(t => (HitObject)new Hit { StartTime = t }).ToList() },
+                // The steps below run before this is checked.
+                PassCondition = () => true,
+            });
+
+            AddStep("find the key for a centre hit", () => key = (Key)new TaikoRuleset().GetDefaultKeyBindings()
+                                                                                       .First(b => b.GetAction<TaikoAction>() == TaikoAction.LeftCentre)
+                                                                                       .KeyCombination.Keys.First());
+
+            // Hits every note on time apart from one, then after the rewind presses nothing, and measures how far play gets before rewinding again.
+            AddStep("play", () => player = Scheduler.AddDelayed(() =>
+            {
+                if (Player?.GameplayClockContainer == null || !Player.IsLoaded || done)
+                    return;
+
+                double t = Player.DrawableRuleset.FrameStableClock.CurrentTime;
+
+                if (!rewoundOnce)
+                {
+                    // A rewind steps back a little each frame, so compare with the furthest point rather than the last frame.
+                    highest = Math.Max(highest, t);
+
+                    if (t < highest - 50)
+                        rewoundOnce = true;
+                    else if (Player.GameplayClockContainer.IsRunning)
+                    {
+                        foreach (double note in noteTimes)
+                        {
+                            if (note != skipped && !pressed.Contains(note) && t >= note - 8 && t < note + 70)
+                            {
+                                pressed.Add(note);
+                                InputManager.PressKey(key);
+                                InputManager.ReleaseKey(key);
+                            }
+                        }
+                    }
+                }
+                else if (!resumed)
+                {
+                    // Still rewinding or in the get-ready pause.
+                    landing = Math.Min(landing, t);
+
+                    if (Player.GameplayClockContainer.IsRunning)
+                    {
+                        resumed = true;
+                        furthest = t;
+                    }
+                }
+                else
+                {
+                    furthest = Math.Max(furthest, t);
+
+                    // The clock is held the moment the next rewind starts.
+                    if (!Player.GameplayClockContainer.IsRunning || t < furthest - 50)
+                        done = true;
+                }
+
+            }, 0, true));
+
+            // Each step may only wait so long, and at half speed the skipped note is a while away.
+            foreach (double milestone in new double[] { 1500, 3000, 4500, 6000, 7500, 9000 })
+                AddUntilStep($"past {milestone}", () => rewoundOnce || Player.DrawableRuleset.FrameStableClock.CurrentTime > milestone);
+            AddUntilStep("rewound for the skipped note", () => rewoundOnce);
+            AddUntilStep("rewound again", () => done);
+            AddAssert("the next rewind waited out the grace period", () =>
+            {
+                TestContext.Progress.WriteLine($"GRACE landed {landing:N0}, got to {furthest:N0} before rewinding again, pressed {pressed.Count} notes, last press {(pressed.Count > 0 ? pressed.Max() : 0):N0}");
+                return furthest - landing >= 300;
+            });
+            AddStep("stop", () => player?.Cancel());
+        }
 
         [Test]
         public void TestMissRewindsThenResumes() => createRewindTest(new TaikoModRewindOnMiss(), new Hit { StartTime = 3000 }, true);

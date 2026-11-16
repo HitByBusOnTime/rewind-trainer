@@ -148,6 +148,26 @@ namespace osu.Game.Rulesets.Mods
         }
 
         /// <summary>
+        /// Where the object containing <paramref name="time"/> starts: a long object's start for anything inside it.
+        /// </summary>
+        public static double StartOfContaining(IEnumerable<HitObject> objects, double time)
+            => objects.Where(o => o.StartTime <= time && o.GetEndTime() >= time)
+                      .Select(o => o.StartTime)
+                      .DefaultIfEmpty(time)
+                      .Min();
+
+        /// <summary>
+        /// Whether a missed object starts so soon after a rewind landed that it couldn't have been reacted to.
+        /// Dense maps rarely leave room to land with much warning, and rewinding again for such a miss would land
+        /// in the same spot every time. The object that was missed to begin with is always further away than this.
+        /// </summary>
+        public static bool IsInGracePeriod(IEnumerable<HitObject> objects, HitObject missed, double landing, double gracePeriod)
+        {
+            double start = StartOfContaining(objects, missed.StartTime);
+            return start >= landing && start < landing + gracePeriod;
+        }
+
+        /// <summary>
         /// How late after its time an object can still be hit, or the general margin when that isn't known.
         /// </summary>
         private static double lateHitMargin(HitObject hitObject)
@@ -169,10 +189,7 @@ namespace osu.Game.Rulesets.Mods
             var sorted = objects.OrderBy(o => o.StartTime).ToList();
 
             // Missing a tick means retrying the whole long object, so count from where it starts.
-            double missedStart = sorted.Where(o => o.StartTime <= missedTime && o.GetEndTime() >= missedTime)
-                                       .Select(o => o.StartTime)
-                                       .DefaultIfEmpty(missedTime)
-                                       .Min();
+            double missedStart = StartOfContaining(sorted, missedTime);
 
             double target = ideal = missedStart - rewindBy;
 
@@ -244,6 +261,11 @@ namespace osu.Game.Rulesets.Mods
         protected virtual bool IgnoreDuringRewind(TAction action) => true;
 
         /// <summary>
+        /// For this long after a rewind lands, missing a note doesn't rewind again: there's no time to react to it.
+        /// </summary>
+        public virtual double GracePeriod => 250;
+
+        /// <summary>
         /// Whether a press should get through anyway, for example because the game is waiting for it after resuming.
         /// </summary>
         protected virtual bool LetPressThrough(DrawableRuleset<TObject> drawableRuleset) => false;
@@ -259,7 +281,7 @@ namespace osu.Game.Rulesets.Mods
         {
             var overlay = new RewindOverlay<TObject, TAction>(drawableRuleset, ShouldRewind,
                 a => IgnoreDuringRewind(a), () => LetPressThrough(drawableRuleset), () => OnRewindSettled(drawableRuleset),
-                RewindSeconds.Value * 1000, AnimationSeconds.Value * 1000, HoldSeconds.Value * 1000);
+                RewindSeconds.Value * 1000, AnimationSeconds.Value * 1000, HoldSeconds.Value * 1000, GracePeriod);
 
             drawableRuleset.Overlays.Add(overlay);
             drawableRuleset.NewResult += overlay.OnNewResult;
@@ -288,6 +310,8 @@ namespace osu.Game.Rulesets.Mods
         private readonly double rewindBy;
         private readonly double animationLength;
         private readonly double holdLength;
+        private readonly double gracePeriod;
+        private double lastLanding = double.NaN;
 
         [Resolved]
         private GameplayClockContainer gameplayClock { get; set; } = null!;
@@ -304,7 +328,7 @@ namespace osu.Game.Rulesets.Mods
         private CircularContainer ring = null!;
 
         public RewindOverlay(DrawableRuleset<TObject> drawableRuleset, Func<JudgementResult, bool> shouldRewind, Func<TAction, bool> ignoreDuringRewind,
-                             Func<bool> letPressThrough, Action settled, double rewindBy, double animationLength, double holdLength)
+                             Func<bool> letPressThrough, Action settled, double rewindBy, double animationLength, double holdLength, double gracePeriod)
         {
             this.drawableRuleset = drawableRuleset;
             this.shouldRewind = shouldRewind;
@@ -314,6 +338,7 @@ namespace osu.Game.Rulesets.Mods
             this.rewindBy = rewindBy;
             this.animationLength = animationLength;
             this.holdLength = holdLength;
+            this.gracePeriod = gracePeriod;
 
             RelativeSizeAxes = Axes.Both;
 
@@ -393,6 +418,9 @@ namespace osu.Game.Rulesets.Mods
             if (!shouldRewind(result))
                 return;
 
+            if (!double.IsNaN(lastLanding) && ModRewind.IsInGracePeriod(drawableRuleset.Objects, result.HitObject, lastLanding, gracePeriod))
+                return;
+
             fromTime = gameplayClock.CurrentTime;
             toTime = Math.Max(ModRewind.GetRewindTarget(drawableRuleset.Objects, Math.Min(result.HitObject.StartTime, fromTime), rewindBy, landings), gameplayClock.StartTime);
 
@@ -400,6 +428,7 @@ namespace osu.Game.Rulesets.Mods
                 return;
 
             landings.Add(toTime);
+            lastLanding = toTime;
             beginRewind();
         }
 

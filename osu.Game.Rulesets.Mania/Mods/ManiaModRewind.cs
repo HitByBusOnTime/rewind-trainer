@@ -17,6 +17,9 @@ namespace osu.Game.Rulesets.Mania.Mods
 {
     public abstract class ManiaModRewind : ModRewind<ManiaHitObject, ManiaAction>
     {
+        // Mania charts are dense across columns, and a note needs a moment to time.
+        public override double GracePeriod => 300;
+
         /// <summary>
         /// Letting go of a hold note too early breaks the hold. The game records that on the hold's body as a bonus-style result,
         /// then only caps the end of the note at a 50, or misses it once the note is over, so on its own it rewinds late or never.

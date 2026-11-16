@@ -13,6 +13,9 @@ namespace osu.Game.Rulesets.Taiko.Mods
 {
     public abstract class TaikoModRewind : ModRewind<TaikoHitObject, TaikoAction>
     {
+        // Taiko streams are dense, and a note needs a moment to time.
+        public override double GracePeriod => 300;
+
         [SettingSource("Drumroll ticks to hit", "A drumroll counts as a miss if you hit less than this percentage of its ticks. 0 turns this off.")]
         public BindableInt DrumRollTicksToHit { get; } = new BindableInt(50)
         {
