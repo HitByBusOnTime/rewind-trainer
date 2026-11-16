@@ -3,17 +3,15 @@
 
 using osu.Framework.Localisation;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Rulesets.Mania.Mods
 {
-    public class ManiaModRewindOnNotSS : ModRewind<ManiaHitObject, ManiaAction>
+    public class ManiaModRewindOnNotSS : ManiaModRewind
     {
         public override string Name => "Rewind on Not SS";
         public override string Acronym => "RS";
         public override LocalisableString Description => "Rewinds half a second before anything that isn't perfect.";
 
-        public override bool ShouldRewind(JudgementResult result) => CostsSS(result);
+        public override bool ShouldRewind(JudgementResult result) => HoldBroken(result) || CostsSS(result);
     }
 }

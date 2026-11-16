@@ -1,10 +1,13 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Input.Bindings;
 using osu.Framework.Testing;
+using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
@@ -13,6 +16,8 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.UI;
+using osuTK.Input;
 
 namespace osu.Game.Rulesets.Mania.Tests.Mods
 {
@@ -81,8 +86,76 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
             => Assert.That(new ManiaModRewindOnMiss().ShouldRewind(resultOf(new TailNote(), HitResult.Miss)), Is.True);
 
         [Test]
-        public void TestHoldBodyNeverTriggers()
-            => Assert.That(new ManiaModRewindOnMiss().ShouldRewind(resultOf(new HoldNoteBody(), HitResult.IgnoreMiss)), Is.False);
+        public void TestLettingGoOfAHoldTooEarlyTriggers()
+        {
+            // Letting go too early breaks the hold, which the game records on the hold's body.
+            Assert.That(new ManiaModRewindOnMiss().ShouldRewind(resultOf(new HoldNoteBody(), HitResult.IgnoreMiss)), Is.True);
+            Assert.That(new ManiaModRewindOnNotSS().ShouldRewind(resultOf(new HoldNoteBody(), HitResult.IgnoreMiss)), Is.True);
+        }
+
+        [Test]
+        public void TestHoldingToTheEndNeverTriggers()
+        {
+            Assert.That(new ManiaModRewindOnMiss().ShouldRewind(resultOf(new HoldNoteBody(), HitResult.IgnoreHit)), Is.False);
+            Assert.That(new ManiaModRewindOnNotSS().ShouldRewind(resultOf(new HoldNoteBody(), HitResult.IgnoreHit)), Is.False);
+        }
+
+        [Test]
+        public void TestLettingGoTooEarlyRewindsRightAway()
+        {
+            Key key = Key.Unknown;
+            bool pressed = false, released = false, rewound = false;
+            double furthest = 0;
+            ScheduledDelegate? player = null;
+
+            CreateModTest(new ModTestData
+            {
+                Mod = new ManiaModRewindOnMiss(),
+                Autoplay = false,
+                CreateBeatmap = () => new Beatmap { HitObjects = new List<HitObject> { new HoldNote { StartTime = 3000, Duration = 2000 } } },
+                // The steps below run before this is checked.
+                PassCondition = () => true,
+            });
+
+            // A test game uses the default keys for however many columns the map has.
+            AddStep("find the key for the first column", () =>
+            {
+                int columns = ((ManiaPlayfield)Player.DrawableRuleset.Playfield).TotalColumns;
+                var binding = new ManiaRuleset().GetDefaultKeyBindings(columns).First(b => b.GetAction<ManiaAction>() == ManiaAction.Key1);
+                key = (Key)binding.KeyCombination.Keys.First();
+            });
+
+            // Test steps only run every so often, too coarse for timing, so this checks every frame.
+            AddStep("hold the note, then let go far too early", () => player = Scheduler.AddDelayed(() =>
+            {
+                // A failed step leaves this running into the next test, after its player has gone.
+                if (Player?.GameplayClockContainer == null || !Player.IsLoaded)
+                    return;
+
+                double t = Player.GameplayClockContainer.CurrentTime;
+
+                if (!pressed && Player.GameplayClockContainer.IsRunning && t >= 2995)
+                {
+                    pressed = true;
+                    InputManager.PressKey(key);
+                }
+                else if (pressed && !released && t >= 3400)
+                {
+                    released = true;
+                    InputManager.ReleaseKey(key);
+                }
+
+                if (!rewound)
+                {
+                    furthest = Math.Max(furthest, t);
+                    rewound = released && t < 2600;
+                }
+            }, 0, true));
+
+            AddUntilStep("rewound", () => rewound);
+            AddAssert("rewound right after letting go, not at the end of the note", () => furthest < 4000);
+            AddStep("stop", () => player?.Cancel());
+        }
 
         [Test]
         public void TestNeverLandsInsideAHold()

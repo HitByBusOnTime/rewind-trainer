@@ -462,6 +462,10 @@ namespace osu.Game.Rulesets.Osu.Tests.Mods
 
             AddStep("hit it when it's due", () => hitter = Scheduler.AddDelayed(() =>
             {
+                // A failed step leaves this running into the next test, after its player has gone.
+                if (Player?.GameplayClockContainer == null || !Player.IsLoaded)
+                    return;
+
                 double t = Player.GameplayClockContainer.CurrentTime;
 
                 if (pressed || !Player.GameplayClockContainer.IsRunning || t < 2990 || t > 3040)
