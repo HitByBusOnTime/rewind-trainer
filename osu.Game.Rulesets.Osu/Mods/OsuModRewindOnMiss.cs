@@ -3,7 +3,6 @@
 
 using osu.Framework.Localisation;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Osu.Mods
 {
@@ -13,9 +12,6 @@ namespace osu.Game.Rulesets.Osu.Mods
         public override string Acronym => "RW";
         public override LocalisableString Description => "Rewinds half a second before a miss.";
 
-        // Not only combo breaks: dropping the end of a slider is a miss which leaves the combo alone.
-        // Bonus spins and the slider's own display-only result aren't things that can be missed.
-        public override bool ShouldRewind(JudgementResult result)
-            => !result.IsHit && !result.Judgement.MaxResult.IsBonus() && result.Judgement.MaxResult != HitResult.IgnoreHit;
+        public override bool ShouldRewind(JudgementResult result) => IsMiss(result);
     }
 }

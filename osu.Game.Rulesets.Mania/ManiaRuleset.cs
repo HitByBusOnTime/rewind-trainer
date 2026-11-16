@@ -247,6 +247,8 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModNoFail(),
                         new MultiMod(new ManiaModHalfTime(), new ManiaModDaycore()),
                         new ManiaModNoRelease(),
+                        new ManiaModRewindOnMiss(),
+                        new ManiaModRewindOnNotSS(),
                     };
 
                 case ModType.DifficultyIncrease:
