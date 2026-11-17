@@ -3,13 +3,16 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Testing;
+using osu.Game.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI;
 
@@ -19,6 +22,16 @@ namespace osu.Game.Rulesets.Mania.Mods
     {
         // Mania charts are dense across columns, and a note needs a moment to time.
         public override double GracePeriod => 300;
+
+        [SettingSource("Rewind on stray presses", "Pressing a key when there's no note to hit counts as a miss.")]
+        public BindableBool RewindOnStrayPresses { get; } = new BindableBool(true);
+
+        protected override bool CountStrayPresses => RewindOnStrayPresses.Value;
+
+        protected override int? LaneOf(ManiaAction action, DrawableRuleset<ManiaHitObject> drawableRuleset)
+            => ((ManiaPlayfield)drawableRuleset.Playfield).Stages.SelectMany(s => s.Columns).FirstOrDefault(c => c.Action.Value == action)?.Index;
+
+        protected override int? LaneOf(HitObject hitObject) => (hitObject as ManiaHitObject)?.Column;
 
         /// <summary>
         /// Letting go of a hold note too early breaks the hold. The game records that on the hold's body as a bonus-style result,

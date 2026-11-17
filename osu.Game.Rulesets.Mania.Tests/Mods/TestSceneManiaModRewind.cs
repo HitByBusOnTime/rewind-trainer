@@ -213,6 +213,83 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
             Assert.That(ModRewind.GetRewindTarget(objects, 5200, 500), Is.LessThan(3000));
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void TestStrayPress(bool rewindOnStrayPresses)
+        {
+            Key key = Key.Unknown;
+            bool hitFirst = false, strayPressed = false, rewound = false;
+            double furthest = double.NegativeInfinity, furthestAtRewind = 0;
+            ScheduledDelegate? player = null;
+
+            CreateModTest(new ModTestData
+            {
+                Mod = new ManiaModRewindOnMiss { RewindOnStrayPresses = { Value = rewindOnStrayPresses } },
+                Autoplay = false,
+                CreateBeatmap = () => new Beatmap
+                {
+                    HitObjects = new List<HitObject> { new Note { StartTime = 1000 }, new Note { StartTime = 4000 } },
+                },
+                // The steps below run before this is checked.
+                PassCondition = () => true,
+            });
+
+            AddStep("find the key for the first column", () =>
+            {
+                int columns = ((ManiaPlayfield)Player.DrawableRuleset.Playfield).TotalColumns;
+                var binding = new ManiaRuleset().GetDefaultKeyBindings(columns).First(b => b.GetAction<ManiaAction>() == ManiaAction.Key1);
+                key = (Key)binding.KeyCombination.Keys.First();
+            });
+
+            // Hits the first note properly, then presses again at 2.5 s, when there's no note anywhere near.
+            AddStep("play", () => player = Scheduler.AddDelayed(() =>
+            {
+                if (Player?.GameplayClockContainer == null || !Player.IsLoaded)
+                    return;
+
+                double t = Player.DrawableRuleset.FrameStableClock.CurrentTime;
+
+                if (!hitFirst && Player.GameplayClockContainer.IsRunning && t >= 995)
+                {
+                    hitFirst = true;
+                    InputManager.PressKey(key);
+                    InputManager.ReleaseKey(key);
+                }
+                else if (hitFirst && !strayPressed && Player.GameplayClockContainer.IsRunning && t >= 2500)
+                {
+                    strayPressed = true;
+                    InputManager.PressKey(key);
+                    InputManager.ReleaseKey(key);
+                }
+
+                if (!rewound)
+                {
+                    furthest = Math.Max(furthest, t);
+
+                    if (t < furthest - 50)
+                    {
+                        rewound = true;
+                        furthestAtRewind = furthest;
+                    }
+                }
+            }, 0, true));
+
+            AddUntilStep("pressed for no reason", () => strayPressed);
+
+            if (rewindOnStrayPresses)
+            {
+                AddUntilStep("rewound", () => rewound);
+                AddAssert("for the stray press, not the proper hit or the later note", () => furthestAtRewind >= 2500 && furthestAtRewind < 3200);
+            }
+            else
+            {
+                AddUntilStep("played on past it", () => Player.DrawableRuleset.FrameStableClock.CurrentTime > 3500);
+                AddAssert("never rewound", () => !rewound);
+            }
+
+            AddStep("stop", () => player?.Cancel());
+        }
+
         [Test]
         public void TestMissRewindsThenResumes() => createRewindTest(new ManiaModRewindOnMiss(), new Note { StartTime = 3000 }, true);
 

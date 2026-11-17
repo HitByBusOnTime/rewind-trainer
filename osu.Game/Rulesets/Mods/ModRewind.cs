@@ -277,11 +277,27 @@ namespace osu.Game.Rulesets.Mods
         {
         }
 
+        /// <summary>
+        /// Whether pressing a key with nothing to hit counts as a miss. Needs <see cref="LaneOf(TAction, DrawableRuleset{TObject})"/>.
+        /// </summary>
+        protected virtual bool CountStrayPresses => false;
+
+        /// <summary>
+        /// The lane a key plays, so a press can be matched with what it hit. Null for keys that don't hit anything.
+        /// </summary>
+        protected virtual int? LaneOf(TAction action, DrawableRuleset<TObject> drawableRuleset) => null;
+
+        /// <summary>
+        /// The lane an object is in.
+        /// </summary>
+        protected virtual int? LaneOf(HitObject hitObject) => null;
+
         public void ApplyToDrawableRuleset(DrawableRuleset<TObject> drawableRuleset)
         {
             var overlay = new RewindOverlay<TObject, TAction>(drawableRuleset, ShouldRewind,
                 a => IgnoreDuringRewind(a), () => LetPressThrough(drawableRuleset), () => OnRewindSettled(drawableRuleset),
-                RewindSeconds.Value * 1000, AnimationSeconds.Value * 1000, HoldSeconds.Value * 1000, GracePeriod);
+                RewindSeconds.Value * 1000, AnimationSeconds.Value * 1000, HoldSeconds.Value * 1000, GracePeriod,
+                CountStrayPresses ? a => LaneOf(a, drawableRuleset) : null, LaneOf);
 
             drawableRuleset.Overlays.Add(overlay);
             drawableRuleset.NewResult += overlay.OnNewResult;
@@ -311,7 +327,16 @@ namespace osu.Game.Rulesets.Mods
         private readonly double animationLength;
         private readonly double holdLength;
         private readonly double gracePeriod;
+        private readonly Func<TAction, int?>? laneOfAction;
+        private readonly Func<HitObject, int?> laneOfObject;
         private double lastLanding = double.NaN;
+
+        /// <summary>
+        /// A press waiting to see whether it hit anything, checked once the input it came with has been handled.
+        /// </summary>
+        private (int lane, double time, long frame)? pendingPress;
+
+        private long frame;
 
         [Resolved]
         private GameplayClockContainer gameplayClock { get; set; } = null!;
@@ -328,7 +353,8 @@ namespace osu.Game.Rulesets.Mods
         private CircularContainer ring = null!;
 
         public RewindOverlay(DrawableRuleset<TObject> drawableRuleset, Func<JudgementResult, bool> shouldRewind, Func<TAction, bool> ignoreDuringRewind,
-                             Func<bool> letPressThrough, Action settled, double rewindBy, double animationLength, double holdLength, double gracePeriod)
+                             Func<bool> letPressThrough, Action settled, double rewindBy, double animationLength, double holdLength, double gracePeriod,
+                             Func<TAction, int?>? laneOfAction, Func<HitObject, int?> laneOfObject)
         {
             this.drawableRuleset = drawableRuleset;
             this.shouldRewind = shouldRewind;
@@ -339,6 +365,8 @@ namespace osu.Game.Rulesets.Mods
             this.animationLength = animationLength;
             this.holdLength = holdLength;
             this.gracePeriod = gracePeriod;
+            this.laneOfAction = laneOfAction;
+            this.laneOfObject = laneOfObject;
 
             RelativeSizeAxes = Axes.Both;
 
@@ -412,6 +440,10 @@ namespace osu.Game.Rulesets.Mods
 
         public void OnNewResult(JudgementResult result)
         {
+            // Anything judged in the lane of a press means the press was for something.
+            if (pendingPress is { } press && laneOfObject(result.HitObject) == press.lane)
+                pendingPress = null;
+
             if (phase != Phase.Idle || drawableRuleset.HasReplayLoaded.Value)
                 return;
 
@@ -421,8 +453,13 @@ namespace osu.Game.Rulesets.Mods
             if (!double.IsNaN(lastLanding) && ModRewind.IsInGracePeriod(drawableRuleset.Objects, result.HitObject, lastLanding, gracePeriod))
                 return;
 
+            rewindFor(result.HitObject.StartTime);
+        }
+
+        private void rewindFor(double missedTime)
+        {
             fromTime = gameplayClock.CurrentTime;
-            toTime = Math.Max(ModRewind.GetRewindTarget(drawableRuleset.Objects, Math.Min(result.HitObject.StartTime, fromTime), rewindBy, landings), gameplayClock.StartTime);
+            toTime = Math.Max(ModRewind.GetRewindTarget(drawableRuleset.Objects, Math.Min(missedTime, fromTime), rewindBy, landings), gameplayClock.StartTime);
 
             if (toTime >= fromTime)
                 return;
@@ -430,6 +467,21 @@ namespace osu.Game.Rulesets.Mods
             landings.Add(toTime);
             lastLanding = toTime;
             beginRewind();
+        }
+
+        /// <summary>
+        /// Whether a press at this time could be a stray one: during the map, not before its first object, after its last or in a break.
+        /// </summary>
+        private bool duringPlay(double time)
+        {
+            if (!drawableRuleset.Objects.Any())
+                return false;
+
+            double first = drawableRuleset.Objects.Min(o => o.StartTime);
+            double last = drawableRuleset.Objects.Max(o => o.GetEndTime());
+
+            return time >= first - 500 && time <= last + 500
+                   && !drawableRuleset.Beatmap.Breaks.Any(b => time >= b.StartTime && time <= b.EndTime);
         }
 
         /// <summary>
@@ -496,6 +548,15 @@ namespace osu.Game.Rulesets.Mods
         // the next real hit instead. Presses while paused, and ones the ruleset says the game is waiting for, go through.
         public bool OnPressed(KeyBindingPressEvent<TAction> e)
         {
+            if (laneOfAction != null && phase == Phase.Idle && !gameplayClock.IsPaused.Value && !drawableRuleset.HasReplayLoaded.Value
+                && laneOfAction(e.Action) is int lane)
+            {
+                double time = drawableRuleset.FrameStableClock.CurrentTime;
+
+                if (duringPlay(time))
+                    pendingPress = (lane, time, frame);
+            }
+
             if (phase == Phase.Idle || gameplayClock.IsPaused.Value || !ignoreDuringRewind(e.Action))
                 return false;
 
@@ -509,6 +570,17 @@ namespace osu.Game.Rulesets.Mods
         protected override void Update()
         {
             base.Update();
+
+            // Input is handled before this updates, so by now anything a press hit has been judged.
+            frame++;
+
+            if (pendingPress is { } press && press.frame < frame)
+            {
+                pendingPress = null;
+
+                if (phase == Phase.Idle)
+                    rewindFor(press.time);
+            }
 
             if (phase == Phase.Idle)
                 return;
