@@ -58,24 +58,12 @@ namespace osu.Game.Tests.NonVisual
                 var objects = playable.HitObjects.OrderBy(o => o.StartTime).ToList();
                 double[] starts = objects.Select(o => o.StartTime).ToArray();
 
-                double grace = ruleset switch
-                {
-                    TaikoRuleset => 300,
-                    ManiaRuleset => 300,
-                    CatchRuleset => 400,
-                    _ => 250,
-                };
-
                 var warnings = new List<double>();
                 var distances = new List<double>();
-                var excused = new List<double>();
 
                 foreach (var missed in objects)
                 {
                     double landing = ModRewind.GetRewindTarget(objects, missed.StartTime, 500);
-
-                    // Notes starting this soon after landing don't rewind again. The first one which can is at least this far off.
-                    excused.Add(objects.Count(o => o.StartTime >= landing && o.StartTime < landing + grace));
 
                     // The next object which starts at or after the landing.
                     int next = Array.BinarySearch(starts, landing);
@@ -91,12 +79,9 @@ namespace osu.Game.Tests.NonVisual
                 int under(double ms) => warnings.Count(w => w < ms);
                 string pct(int n) => $"{n} ({100.0 * n / warnings.Count:N1}%)";
 
-                excused.Sort();
-
                 TestContext.Progress.WriteLine(
                     $"PROBE {ruleset.ShortName,-6} {decoded.Metadata.Title} [{decoded.BeatmapInfo.DifficultyName}] n={objects.Count}: "
-                    + $"landed under {grace}ms before a note {pct(under(grace))}; after the grace period every note that can rewind has {grace}ms+ | "
-                    + $"notes excused per rewind: median {percentile(excused, 0.5):N0}, 95% {percentile(excused, 0.95):N0}, max {excused.Last():N0} | "
+                    + $"warning <100ms {pct(under(100))}, <200ms {pct(under(200))}, <300ms {pct(under(300))} | "
                     + $"back median {percentile(distances, 0.5):N0}ms, 95% {percentile(distances, 0.95):N0}ms");
             }
         }

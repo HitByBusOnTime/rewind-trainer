@@ -144,7 +144,7 @@ namespace osu.Game.Rulesets.Taiko.Tests.Mods
         public void TestSkippedDrumRollRewindsInPlay() => createRewindTest(new TaikoModRewindOnMiss(), drumRoll(), false);
 
         [Test]
-        public void TestNoteRightAfterLandingDoesNotRewindAgain()
+        public void TestMissRightAfterLandingStillRewinds()
         {
             // A stream long and dense enough that the rewind has to land in it with almost no warning.
             const double skipped = 10000;
@@ -227,10 +227,10 @@ namespace osu.Game.Rulesets.Taiko.Tests.Mods
                 AddUntilStep($"past {milestone}", () => rewoundOnce || Player.DrawableRuleset.FrameStableClock.CurrentTime > milestone);
             AddUntilStep("rewound for the skipped note", () => rewoundOnce);
             AddUntilStep("rewound again", () => done);
-            AddAssert("the next rewind waited out the grace period", () =>
+            AddAssert("missing the first note after landing rewinds again", () =>
             {
-                TestContext.Progress.WriteLine($"GRACE landed {landing:N0}, got to {furthest:N0} before rewinding again, pressed {pressed.Count} notes, last press {(pressed.Count > 0 ? pressed.Max() : 0):N0}");
-                return furthest - landing >= 300;
+                TestContext.Progress.WriteLine($"AGAIN landed {landing:N0}, got to {furthest:N0} before rewinding again, pressed {pressed.Count} notes, last press {(pressed.Count > 0 ? pressed.Max() : 0):N0}");
+                return furthest - landing < 300;
             });
             AddStep("stop", () => player?.Cancel());
         }

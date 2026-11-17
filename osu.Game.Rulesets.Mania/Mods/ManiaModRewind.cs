@@ -20,9 +20,6 @@ namespace osu.Game.Rulesets.Mania.Mods
 {
     public abstract class ManiaModRewind : ModRewind<ManiaHitObject, ManiaAction>
     {
-        // Mania charts are dense across columns, and a note needs a moment to time.
-        public override double GracePeriod => 300;
-
         [SettingSource("Rewind on stray presses", "Pressing a key when there's no note to hit counts as a miss.")]
         public BindableBool RewindOnStrayPresses { get; } = new BindableBool(true);
 

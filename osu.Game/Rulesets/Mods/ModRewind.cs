@@ -157,17 +157,6 @@ namespace osu.Game.Rulesets.Mods
                       .Min();
 
         /// <summary>
-        /// Whether a missed object starts so soon after a rewind landed that it couldn't have been reacted to.
-        /// Dense maps rarely leave room to land with much warning, and rewinding again for such a miss would land
-        /// in the same spot every time. The object that was missed to begin with is always further away than this.
-        /// </summary>
-        public static bool IsInGracePeriod(IEnumerable<HitObject> objects, HitObject missed, double landing, double gracePeriod)
-        {
-            double start = StartOfContaining(objects, missed.StartTime);
-            return start >= landing && start < landing + gracePeriod;
-        }
-
-        /// <summary>
         /// How late after its time an object can still be hit, or the general margin when that isn't known.
         /// </summary>
         private static double lateHitMargin(HitObject hitObject)
@@ -256,14 +245,10 @@ namespace osu.Game.Rulesets.Mods
         where TAction : struct
     {
         /// <summary>
-        /// Whether a key is ignored during a rewind. By default every gameplay key is, so nothing gets hit while time stands still.
+        /// Whether a key is ignored during a rewind. By default every gameplay key is, so nothing gets hit while time stands still,
+        /// apart from just before play resumes.
         /// </summary>
         protected virtual bool IgnoreDuringRewind(TAction action) => true;
-
-        /// <summary>
-        /// For this long after a rewind lands, missing a note doesn't rewind again: there's no time to react to it.
-        /// </summary>
-        public virtual double GracePeriod => 250;
 
         /// <summary>
         /// Whether a press should get through anyway, for example because the game is waiting for it after resuming.
@@ -296,7 +281,7 @@ namespace osu.Game.Rulesets.Mods
         {
             var overlay = new RewindOverlay<TObject, TAction>(drawableRuleset, ShouldRewind,
                 a => IgnoreDuringRewind(a), () => LetPressThrough(drawableRuleset), () => OnRewindSettled(drawableRuleset),
-                RewindSeconds.Value * 1000, AnimationSeconds.Value * 1000, HoldSeconds.Value * 1000, GracePeriod,
+                RewindSeconds.Value * 1000, AnimationSeconds.Value * 1000, HoldSeconds.Value * 1000,
                 CountStrayPresses ? a => LaneOf(a, drawableRuleset) : null, LaneOf);
 
             drawableRuleset.Overlays.Add(overlay);
@@ -326,10 +311,16 @@ namespace osu.Game.Rulesets.Mods
         private readonly double rewindBy;
         private readonly double animationLength;
         private readonly double holdLength;
-        private readonly double gracePeriod;
         private readonly Func<TAction, int?>? laneOfAction;
         private readonly Func<HitObject, int?> laneOfObject;
-        private double lastLanding = double.NaN;
+
+        /// <summary>
+        /// How long before play resumes a press already counts. People time the note sitting on the line by the closing ring,
+        /// and a press a moment too early used to be swallowed, which missed that note. It's judged at the time the rewind landed on.
+        /// </summary>
+        private const double early_press_window = 150;
+
+        private bool nudged;
 
         /// <summary>
         /// A press waiting to see whether it hit anything, checked once the input it came with has been handled.
@@ -353,7 +344,7 @@ namespace osu.Game.Rulesets.Mods
         private CircularContainer ring = null!;
 
         public RewindOverlay(DrawableRuleset<TObject> drawableRuleset, Func<JudgementResult, bool> shouldRewind, Func<TAction, bool> ignoreDuringRewind,
-                             Func<bool> letPressThrough, Action settled, double rewindBy, double animationLength, double holdLength, double gracePeriod,
+                             Func<bool> letPressThrough, Action settled, double rewindBy, double animationLength, double holdLength,
                              Func<TAction, int?>? laneOfAction, Func<HitObject, int?> laneOfObject)
         {
             this.drawableRuleset = drawableRuleset;
@@ -364,7 +355,6 @@ namespace osu.Game.Rulesets.Mods
             this.rewindBy = rewindBy;
             this.animationLength = animationLength;
             this.holdLength = holdLength;
-            this.gracePeriod = gracePeriod;
             this.laneOfAction = laneOfAction;
             this.laneOfObject = laneOfObject;
 
@@ -450,9 +440,6 @@ namespace osu.Game.Rulesets.Mods
             if (!shouldRewind(result))
                 return;
 
-            if (!double.IsNaN(lastLanding) && ModRewind.IsInGracePeriod(drawableRuleset.Objects, result.HitObject, lastLanding, gracePeriod))
-                return;
-
             rewindFor(result.HitObject.StartTime);
         }
 
@@ -465,7 +452,6 @@ namespace osu.Game.Rulesets.Mods
                 return;
 
             landings.Add(toTime);
-            lastLanding = toTime;
             beginRewind();
         }
 
@@ -514,6 +500,7 @@ namespace osu.Game.Rulesets.Mods
         {
             phase = Phase.Holding;
             elapsed = 0;
+            nudged = false;
 
             settled();
 
@@ -558,6 +545,9 @@ namespace osu.Game.Rulesets.Mods
             }
 
             if (phase == Phase.Idle || gameplayClock.IsPaused.Value || !ignoreDuringRewind(e.Action))
+                return false;
+
+            if (phase == Phase.Holding && elapsed >= holdLength - early_press_window)
                 return false;
 
             return !letPressThrough();
@@ -614,6 +604,15 @@ namespace osu.Game.Rulesets.Mods
                     break;
 
                 case Phase.Holding:
+                    // Time stopped while it was going backwards, so the game still thinks it's rewinding, and judges nothing until it moves forwards.
+                    // Step forwards a hair once gameplay has caught up, so a press just before play resumes can hit.
+                    if (!nudged && drawableRuleset.FrameStableClock.IsRewinding
+                                && Math.Abs(drawableRuleset.FrameStableClock.CurrentTime - gameplayClock.CurrentTime) < 1)
+                    {
+                        nudged = true;
+                        gameplayClock.Seek(gameplayClock.CurrentTime + 1);
+                    }
+
                     if (elapsed >= holdLength)
                         release();
                     break;

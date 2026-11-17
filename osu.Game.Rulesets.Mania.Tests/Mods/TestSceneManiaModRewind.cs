@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Testing;
@@ -287,6 +288,138 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
                 AddAssert("never rewound", () => !rewound);
             }
 
+            AddStep("stop", () => player?.Cancel());
+        }
+
+        /// <summary>
+        /// How long the get-ready pause has left, or null outside it.
+        /// </summary>
+        private double? pauseTimeLeft()
+        {
+            var overlay = Player.DrawableRuleset.Overlays.Children.FirstOrDefault(d => d.GetType().Name.StartsWith("RewindOverlay", StringComparison.Ordinal));
+
+            if (overlay == null)
+                return null;
+
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            var type = overlay.GetType();
+
+            if (type.GetField("phase", flags)!.GetValue(overlay)!.ToString() != "Holding")
+                return null;
+
+            return (double)type.GetField("holdLength", flags)!.GetValue(overlay)! - (double)type.GetField("elapsed", flags)!.GetValue(overlay)!;
+        }
+
+        [Test]
+        public void TestPressJustBeforeResumeHitsTheNote()
+        {
+            // A stream long enough that there's no room to land away from a note anywhere near, so the rewind lands just before one.
+            const double skipped = 8000;
+            var noteTimes = new List<double>();
+            for (double t = 1000; t <= 9000; t += 100)
+                noteTimes.Add(t);
+
+            Key key = Key.Unknown;
+            var pressed = new HashSet<double>();
+            bool rewoundOnce = false, pressedInPause = false, resumed = false, rewoundAgain = false;
+            double highest = double.NegativeInfinity, landing = double.MaxValue, furthest = double.NegativeInfinity, pausePressAt = double.NaN;
+            ScheduledDelegate? player = null;
+
+            CreateModTest(new ModTestData
+            {
+                // Slowed down so the test's per-frame presses land on every note: frames in a test can be far apart in song time.
+                Mods = new Mod[] { new ManiaModRewindOnMiss(), new ManiaModHalfTime { SpeedChange = { Value = 0.5 } } },
+                Autoplay = false,
+                CreateBeatmap = () => new Beatmap { HitObjects = noteTimes.Select(t => (HitObject)new Note { StartTime = t }).ToList() },
+                // The steps below run before this is checked.
+                PassCondition = () => true,
+            });
+
+            AddStep("find the key for the first column", () =>
+            {
+                int columns = ((ManiaPlayfield)Player.DrawableRuleset.Playfield).TotalColumns;
+                var binding = new ManiaRuleset().GetDefaultKeyBindings(columns).First(b => b.GetAction<ManiaAction>() == ManiaAction.Key1);
+                key = (Key)binding.KeyCombination.Keys.First();
+            });
+
+            // Hits every note on time apart from one. In the get-ready pause after the rewind it presses once, a moment before
+            // play resumes, for the note sitting on the line, the way someone times it by the closing ring. Then it plays on.
+            AddStep("play", () => player = Scheduler.AddDelayed(() =>
+            {
+                if (Player?.GameplayClockContainer == null || !Player.IsLoaded)
+                    return;
+
+                double t = Player.DrawableRuleset.FrameStableClock.CurrentTime;
+                bool running = Player.GameplayClockContainer.IsRunning;
+
+                if (!rewoundOnce)
+                {
+                    // A rewind steps back a little each frame, so compare with the furthest point rather than the last frame.
+                    highest = Math.Max(highest, t);
+
+                    if (t < highest - 50)
+                        rewoundOnce = true;
+                }
+                else if (!resumed)
+                {
+                    if (running)
+                    {
+                        resumed = true;
+                        furthest = t;
+                    }
+                    else
+                    {
+                        landing = Math.Min(landing, t);
+
+                        // The rewind undid everything after where it lands, so those notes get played again.
+                        if (!pressedInPause)
+                            pressed.RemoveWhere(n => n > t);
+
+                        if (!pressedInPause && pauseTimeLeft() is double left && left < 80)
+                        {
+                            pressedInPause = true;
+                            pausePressAt = t;
+                            pressed.Add(noteTimes.First(n => n > t));
+                            InputManager.PressKey(key);
+                            InputManager.ReleaseKey(key);
+                        }
+
+                        return;
+                    }
+                }
+                else
+                {
+                    furthest = Math.Max(furthest, t);
+
+                    if (!running || t < furthest - 50)
+                        rewoundAgain = true;
+                }
+
+                if (!running || rewoundAgain)
+                    return;
+
+                foreach (double note in noteTimes)
+                {
+                    if (note != skipped && !pressed.Contains(note) && t >= note - 8 && t < note + 70)
+                    {
+                        pressed.Add(note);
+                        InputManager.PressKey(key);
+                        InputManager.ReleaseKey(key);
+                    }
+                }
+            }, 0, true));
+
+            // Each step may only wait so long, and at half speed the skipped note is a while away.
+            foreach (double milestone in new double[] { 1500, 3000, 4500, 6000, 7500 })
+                AddUntilStep($"past {milestone}", () => rewoundOnce || Player.DrawableRuleset.FrameStableClock.CurrentTime > milestone);
+            AddUntilStep("rewound for the skipped note", () => rewoundOnce);
+            AddUntilStep("resumed", () => resumed);
+            AddUntilStep("played on a while", () => rewoundAgain || furthest > 7800);
+            AddAssert("the note on the line was hit by the early press", () =>
+            {
+                TestContext.Progress.WriteLine($"EARLY landed {landing:N0}, pressed in the pause at {pausePressAt:N0}, then got to {furthest:N0}, rewound again: {rewoundAgain}");
+                return pressedInPause && !rewoundAgain;
+            });
             AddStep("stop", () => player?.Cancel());
         }
 

@@ -1,9 +1,11 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Threading;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Judgements;
@@ -101,6 +103,55 @@ namespace osu.Game.Rulesets.Catch.Tests.Mods
             AddStep("note where the catcher is", () => startX = Player.ChildrenOfType<Catcher>().First().X);
             AddUntilStep("the catcher moves left", () => Player.ChildrenOfType<Catcher>().First().X < startX - 20);
             AddStep("let go", () => InputManager.ReleaseKey(Key.Left));
+        }
+
+        [Test]
+        public void TestCatcherGoesBackToWhereItWas()
+        {
+            bool moved = false, pastMiss = false;
+            ScheduledDelegate? player = null;
+
+            CreateModTest(new ModTestData
+            {
+                Mod = new CatchModRewindOnMiss(),
+                Autoplay = false,
+                // Fruit right where the catcher starts, then one far to the left. The rewind for that one lands at 2.5 s.
+                CreateBeatmap = () => new Beatmap
+                {
+                    HitObjects = new List<HitObject>
+                    {
+                        new Fruit { StartTime = 1000, X = CatchPlayfield.CENTER_X },
+                        new Fruit { StartTime = 1600, X = CatchPlayfield.CENTER_X },
+                        new Fruit { StartTime = 2200, X = CatchPlayfield.CENTER_X },
+                        new Fruit { StartTime = 3000, X = 0 },
+                    },
+                },
+                // The steps below run before this is checked.
+                PassCondition = () => true,
+            });
+
+            // After where the rewind will land, the catcher goes to the far right, so the fruit on the left is missed.
+            AddStep("play", () => player = Scheduler.AddDelayed(() =>
+            {
+                if (Player?.GameplayClockContainer == null || !Player.IsLoaded)
+                    return;
+
+                double t = Player.DrawableRuleset.FrameStableClock.CurrentTime;
+
+                if (!moved && Player.GameplayClockContainer.IsRunning && t > 2700)
+                {
+                    moved = true;
+                    Player.ChildrenOfType<CatcherArea>().First().SetCatcherPosition(CatchPlayfield.WIDTH);
+                }
+
+                if (t > 3000)
+                    pastMiss = true;
+            }, 0, true));
+
+            AddUntilStep("moved away", () => moved);
+            AddUntilStep("missed and rewound", () => pastMiss && Player.DrawableRuleset.FrameStableClock.CurrentTime < 2600);
+            AddUntilStep("the catcher is back where it was then", () => Math.Abs(Player.ChildrenOfType<Catcher>().First().X - CatchPlayfield.CENTER_X) < 5);
+            AddStep("stop", () => player?.Cancel());
         }
 
         // Far to the side, away from where the catcher starts.
