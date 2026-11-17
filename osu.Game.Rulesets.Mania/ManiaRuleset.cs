@@ -298,7 +298,8 @@ namespace osu.Game.Rulesets.Mania
                     {
                         new MultiMod(new ModWindUp(), new ModWindDown()),
                         new ManiaModMuted(),
-                        new ModAdaptiveSpeed()
+                        new ModAdaptiveSpeed(),
+                        new ManiaModColumnColours(),
                     };
 
                 case ModType.System:
