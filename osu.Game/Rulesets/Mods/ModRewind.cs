@@ -268,6 +268,11 @@ namespace osu.Game.Rulesets.Mods
         protected virtual bool CountStrayPresses => false;
 
         /// <summary>
+        /// Whether holding a key down with no long note to hold counts as a miss. Needs both <c>LaneOf</c> overloads.
+        /// </summary>
+        protected virtual bool CountHeldKeys => false;
+
+        /// <summary>
         /// The lane a key plays, so a press can be matched with what it hit. Null for keys that don't hit anything.
         /// </summary>
         protected virtual int? LaneOf(TAction action, DrawableRuleset<TObject> drawableRuleset) => null;
@@ -282,7 +287,7 @@ namespace osu.Game.Rulesets.Mods
             var overlay = new RewindOverlay<TObject, TAction>(drawableRuleset, ShouldRewind,
                 a => IgnoreDuringRewind(a), () => LetPressThrough(drawableRuleset), () => OnRewindSettled(drawableRuleset),
                 RewindSeconds.Value * 1000, AnimationSeconds.Value * 1000, HoldSeconds.Value * 1000,
-                CountStrayPresses ? a => LaneOf(a, drawableRuleset) : null, LaneOf);
+                a => LaneOf(a, drawableRuleset), LaneOf, CountStrayPresses, CountHeldKeys);
 
             drawableRuleset.Overlays.Add(overlay);
             drawableRuleset.NewResult += overlay.OnNewResult;
@@ -311,8 +316,20 @@ namespace osu.Game.Rulesets.Mods
         private readonly double rewindBy;
         private readonly double animationLength;
         private readonly double holdLength;
-        private readonly Func<TAction, int?>? laneOfAction;
+        private readonly Func<TAction, int?> laneOfAction;
         private readonly Func<HitObject, int?> laneOfObject;
+        private readonly bool countStrayPresses;
+        private readonly bool countHeldKeys;
+
+        /// <summary>
+        /// How much longer than it's needed a key may stay down: past the press for a normal note, past the end for a long one.
+        /// </summary>
+        private const double held_key_allowance = 400;
+
+        /// <summary>
+        /// Keys held down since a press during play, by lane: when the press was, and until when it's needed.
+        /// </summary>
+        private readonly Dictionary<int, (double pressed, double neededUntil)> heldKeys = new Dictionary<int, (double pressed, double neededUntil)>();
 
         /// <summary>
         /// How long before play resumes a press already counts. People time the note sitting on the line by the closing ring,
@@ -345,7 +362,7 @@ namespace osu.Game.Rulesets.Mods
 
         public RewindOverlay(DrawableRuleset<TObject> drawableRuleset, Func<JudgementResult, bool> shouldRewind, Func<TAction, bool> ignoreDuringRewind,
                              Func<bool> letPressThrough, Action settled, double rewindBy, double animationLength, double holdLength,
-                             Func<TAction, int?>? laneOfAction, Func<HitObject, int?> laneOfObject)
+                             Func<TAction, int?> laneOfAction, Func<HitObject, int?> laneOfObject, bool countStrayPresses, bool countHeldKeys)
         {
             this.drawableRuleset = drawableRuleset;
             this.shouldRewind = shouldRewind;
@@ -357,6 +374,8 @@ namespace osu.Game.Rulesets.Mods
             this.holdLength = holdLength;
             this.laneOfAction = laneOfAction;
             this.laneOfObject = laneOfObject;
+            this.countStrayPresses = countStrayPresses;
+            this.countHeldKeys = countHeldKeys;
 
             RelativeSizeAxes = Axes.Both;
 
@@ -483,6 +502,7 @@ namespace osu.Game.Rulesets.Mods
         {
             phase = Phase.Rewinding;
             elapsed = 0;
+            heldKeys.Clear();
 
             gameplayClock.HoldClock();
 
@@ -535,13 +555,19 @@ namespace osu.Game.Rulesets.Mods
         // the next real hit instead. Presses while paused, and ones the ruleset says the game is waiting for, go through.
         public bool OnPressed(KeyBindingPressEvent<TAction> e)
         {
-            if (laneOfAction != null && phase == Phase.Idle && !gameplayClock.IsPaused.Value && !drawableRuleset.HasReplayLoaded.Value
+            if ((countStrayPresses || countHeldKeys) && phase == Phase.Idle && !gameplayClock.IsPaused.Value && !drawableRuleset.HasReplayLoaded.Value
                 && laneOfAction(e.Action) is int lane)
             {
                 double time = drawableRuleset.FrameStableClock.CurrentTime;
 
                 if (duringPlay(time))
-                    pendingPress = (lane, time, frame);
+                {
+                    if (countStrayPresses)
+                        pendingPress = (lane, time, frame);
+
+                    if (countHeldKeys)
+                        heldKeys[lane] = (time, neededUntil(lane, time));
+                }
             }
 
             if (phase == Phase.Idle || gameplayClock.IsPaused.Value || !ignoreDuringRewind(e.Action))
@@ -555,6 +581,25 @@ namespace osu.Game.Rulesets.Mods
 
         public void OnReleased(KeyBindingReleaseEvent<TAction> e)
         {
+            if (laneOfAction(e.Action) is int lane)
+                heldKeys.Remove(lane);
+        }
+
+        /// <summary>
+        /// Until when a key pressed at this time is needed: to the end of a long note in its lane that the press could start, otherwise only the press itself.
+        /// </summary>
+        private double neededUntil(int lane, double pressTime)
+        {
+            double until = pressTime;
+
+            foreach (var hitObject in drawableRuleset.Objects)
+            {
+                if (hitObject.GetEndTime() > hitObject.StartTime && laneOfObject(hitObject) == lane
+                                                                 && Math.Abs(hitObject.StartTime - pressTime) <= held_key_allowance)
+                    until = Math.Max(until, hitObject.GetEndTime());
+            }
+
+            return until;
         }
 
         protected override void Update()
@@ -570,6 +615,25 @@ namespace osu.Game.Rulesets.Mods
 
                 if (phase == Phase.Idle)
                     rewindFor(press.time);
+            }
+
+            // A pause may end with a key let go of where gameplay doesn't see it, so start afresh after one.
+            if (gameplayClock.IsPaused.Value)
+                heldKeys.Clear();
+
+            if (countHeldKeys && phase == Phase.Idle && heldKeys.Count > 0)
+            {
+                double now = drawableRuleset.FrameStableClock.CurrentTime;
+
+                foreach (var (_, held) in heldKeys)
+                {
+                    if (now > held.neededUntil + held_key_allowance && duringPlay(now))
+                    {
+                        heldKeys.Clear();
+                        rewindFor(held.pressed);
+                        break;
+                    }
+                }
             }
 
             if (phase == Phase.Idle)

@@ -423,6 +423,99 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
             AddStep("stop", () => player?.Cancel());
         }
 
+        /// <summary>
+        /// Presses for the first object and lets go at <paramref name="releaseAt"/>, then reports whether play rewound before 3.5 s.
+        /// </summary>
+        private void heldKeyTest(bool rewindOnHeldKeys, HitObject first, double releaseAt, bool expectRewind, double notBefore = 300)
+        {
+            Key key = Key.Unknown;
+            bool pressed = false, released = false, rewound = false;
+            double furthest = double.NegativeInfinity, furthestAtRewind = 0;
+            ScheduledDelegate? player = null;
+
+            CreateModTest(new ModTestData
+            {
+                Mod = new ManiaModRewindOnMiss { RewindOnHeldKeys = { Value = rewindOnHeldKeys } },
+                Autoplay = false,
+                CreateBeatmap = () => new Beatmap { HitObjects = new List<HitObject> { first, new Note { StartTime = 5000 } } },
+                // The steps below run before this is checked.
+                PassCondition = () => true,
+            });
+
+            AddStep("find the key for the first column", () =>
+            {
+                int columns = ((ManiaPlayfield)Player.DrawableRuleset.Playfield).TotalColumns;
+                var binding = new ManiaRuleset().GetDefaultKeyBindings(columns).First(b => b.GetAction<ManiaAction>() == ManiaAction.Key1);
+                key = (Key)binding.KeyCombination.Keys.First();
+            });
+
+            AddStep("play", () => player = Scheduler.AddDelayed(() =>
+            {
+                if (Player?.GameplayClockContainer == null || !Player.IsLoaded)
+                    return;
+
+                double t = Player.DrawableRuleset.FrameStableClock.CurrentTime;
+
+                if (!pressed && Player.GameplayClockContainer.IsRunning && t >= first.StartTime - 5)
+                {
+                    pressed = true;
+                    InputManager.PressKey(key);
+                }
+                else if (pressed && !released && (rewound || t >= releaseAt))
+                {
+                    released = true;
+                    InputManager.ReleaseKey(key);
+                }
+
+                if (!rewound)
+                {
+                    furthest = Math.Max(furthest, t);
+
+                    if (t < furthest - 50)
+                    {
+                        rewound = true;
+                        furthestAtRewind = furthest;
+                    }
+                }
+            }, 0, true));
+
+            AddUntilStep("pressed", () => pressed);
+
+            if (expectRewind)
+            {
+                AddUntilStep("rewound", () => rewound);
+                AddAssert("soon after the key should have been let go", () =>
+                {
+                    TestContext.Progress.WriteLine($"HELD rewound at {furthestAtRewind:N0}");
+                    return furthestAtRewind > first.GetEndTime() + notBefore && furthestAtRewind < first.GetEndTime() + 700;
+                });
+            }
+            else
+            {
+                AddUntilStep("played on", () => rewound || Player.DrawableRuleset.FrameStableClock.CurrentTime > 3500);
+                AddAssert("never rewound", () => !rewound);
+            }
+
+            AddStep("let go", () =>
+            {
+                player?.Cancel();
+                InputManager.ReleaseKey(key);
+            });
+        }
+
+        [Test]
+        public void TestHoldingANoteTooLongRewinds() => heldKeyTest(true, new Note { StartTime = 1000 }, 3000, true);
+
+        [Test]
+        public void TestHeldKeysCanBeTurnedOff() => heldKeyTest(false, new Note { StartTime = 1000 }, 3000, false);
+
+        [Test]
+        public void TestHoldingALongNoteIsFine() => heldKeyTest(true, new HoldNote { StartTime = 1000, Duration = 1500 }, 2550, false);
+
+        // The game itself misses a long note's end that isn't let go of in time.
+        [Test]
+        public void TestHoldingPastTheEndOfALongNoteRewinds() => heldKeyTest(true, new HoldNote { StartTime = 1000, Duration = 1000 }, 3200, true, 0);
+
         [Test]
         public void TestMissRewindsThenResumes() => createRewindTest(new ManiaModRewindOnMiss(), new Note { StartTime = 3000 }, true);
 

@@ -25,6 +25,11 @@ namespace osu.Game.Rulesets.Mania.Mods
 
         protected override bool CountStrayPresses => RewindOnStrayPresses.Value;
 
+        [SettingSource("Rewind on held keys", "Holding a key down when there's no long note to hold counts as a miss.")]
+        public BindableBool RewindOnHeldKeys { get; } = new BindableBool(true);
+
+        protected override bool CountHeldKeys => RewindOnHeldKeys.Value;
+
         protected override int? LaneOf(ManiaAction action, DrawableRuleset<ManiaHitObject> drawableRuleset)
             => ((ManiaPlayfield)drawableRuleset.Playfield).Stages.SelectMany(s => s.Columns).FirstOrDefault(c => c.Action.Value == action)?.Index;
 
