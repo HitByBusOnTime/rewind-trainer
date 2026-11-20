@@ -322,9 +322,15 @@ namespace osu.Game.Rulesets.Mods
         private readonly bool countHeldKeys;
 
         /// <summary>
-        /// How long a key may stay down after the press for a normal note.
+        /// How long a key may stay down after the press for a normal note. Deliberately strict: the player asked for it,
+        /// to train out holding taps too long (their taps measured about 0.15 s).
         /// </summary>
-        private const double held_key_allowance = 400;
+        private const double held_key_allowance = 100;
+
+        /// <summary>
+        /// How far from a long note's start a press can be and still be the one that starts it.
+        /// </summary>
+        private const double long_note_press_window = 250;
 
         /// <summary>
         /// How late a long note may be let go of. The game itself only misses its end at about twice this, and gives a lower judgement before that.
@@ -601,7 +607,7 @@ namespace osu.Game.Rulesets.Mods
             foreach (var hitObject in drawableRuleset.Objects)
             {
                 if (hitObject.GetEndTime() > hitObject.StartTime && laneOfObject(hitObject) == lane
-                                                                 && Math.Abs(hitObject.StartTime - pressTime) <= held_key_allowance)
+                                                                 && Math.Abs(hitObject.StartTime - pressTime) <= long_note_press_window)
                     longNoteEnd = Math.Max(longNoteEnd ?? double.NegativeInfinity, hitObject.GetEndTime());
             }
 
