@@ -24,7 +24,7 @@ A rewind plays backwards, pauses briefly so you can place your cursor, then resu
 
 The rewind distance, animation length and pause can be changed in each mod's settings.
 
-There's also **Column Colours (CC)** for osu!mania, in the Fun column of the mod menu. Every key's column gets its own fixed colour, so it's easy to see which key a note is for. It works with up to 10 keys per stage; with two stages, both use the same colours for matching keys. Classic-style skins have their note images tinted, so light notes take the colour best.
+There's also **Column Colours (CC)** for osu!mania, in the Fun column of the mod menu. Every key gets its own colour, and keeps it at any key count (F is always green, J always cyan), so it's easy to see which finger a note is for. It works with up to 10 keys per stage; with two stages, both use the same colours for matching keys. Classic-style skins have their note images tinted, so light notes take the colour best.
 
 ## Install (Windows 64-bit)
 
