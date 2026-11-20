@@ -7,7 +7,6 @@ using System.Linq;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
 using osu.Framework.Testing;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -30,54 +29,30 @@ namespace osu.Game.Rulesets.Mania.Mods
         public override string Acronym => "CC";
         public override IconUsage? Icon => FontAwesome.Solid.Palette;
         public override ModType Type => ModType.Fun;
-        public override LocalisableString Description => "Every key gets its own colour, the same at any key count.";
+        public override LocalisableString Description => "Every column gets its own colour: the 1st is always red, the 2nd orange, and so on.";
 
         /// <summary>
-        /// A colour for each key of the game's standard layout, left to right, so a key (and the finger on it) has the same colour
-        /// at every key count: F is green on 4K, 5K and 7K alike. Colours used to be spread over the keys a map had, which gave
-        /// the same finger a different colour on each key count.
+        /// A colour for each column number, left to right, the same at every key count: the 1st column is red on 4K, 7K and 10K alike.
+        /// Rainbow order first, so the usual key counts get the most different colours. More columns than this start over.
         /// </summary>
-        public static readonly IReadOnlyDictionary<InputKey, Color4> KEY_COLOURS = new Dictionary<InputKey, Color4>
+        public static readonly Color4[] COLUMN_COLOURS =
         {
-            [InputKey.A] = Color4Extensions.FromHex("ff3b3b"), // red
-            [InputKey.S] = Color4Extensions.FromHex("ff8a1f"), // orange
-            [InputKey.D] = Color4Extensions.FromHex("ffd60a"), // yellow
-            [InputKey.F] = Color4Extensions.FromHex("2ecc71"), // green
-            [InputKey.V] = Color4Extensions.FromHex("e0e0e0"), // light grey, 10 keys only
-            [InputKey.Space] = Color4Extensions.FromHex("ffffff"), // white, the middle key
-            [InputKey.N] = Color4Extensions.FromHex("9e9e9e"), // grey, 10 keys only
-            [InputKey.J] = Color4Extensions.FromHex("1ed3e0"), // cyan
-            [InputKey.K] = Color4Extensions.FromHex("3b82f6"), // blue
-            [InputKey.L] = Color4Extensions.FromHex("b65cff"), // purple
-            [InputKey.Semicolon] = Color4Extensions.FromHex("ff4fb8"), // pink
+            Color4Extensions.FromHex("ff3b3b"), // 1 red
+            Color4Extensions.FromHex("ff8a1f"), // 2 orange
+            Color4Extensions.FromHex("ffd60a"), // 3 yellow
+            Color4Extensions.FromHex("2ecc71"), // 4 green
+            Color4Extensions.FromHex("1ed3e0"), // 5 cyan
+            Color4Extensions.FromHex("3b82f6"), // 6 blue
+            Color4Extensions.FromHex("b65cff"), // 7 purple
+            Color4Extensions.FromHex("ff4fb8"), // 8 pink
+            Color4Extensions.FromHex("ffffff"), // 9 white
+            Color4Extensions.FromHex("9e9e9e"), // 10 grey
         };
 
         /// <summary>
-        /// The game's default keys for a stage with <paramref name="columns"/> keys: the innermost left-hand keys, Space in the middle
-        /// when the count is odd, then the right-hand keys. The same rule the game uses to make its default key bindings.
+        /// The colour for a column: by its number alone, whatever the key count.
         /// </summary>
-        public static InputKey[] DefaultKeysFor(int columns)
-        {
-            InputKey[] left = columns == 10 ? new[] { InputKey.A, InputKey.S, InputKey.D, InputKey.F, InputKey.V } : new[] { InputKey.A, InputKey.S, InputKey.D, InputKey.F };
-            InputKey[] right = columns == 10 ? new[] { InputKey.N, InputKey.J, InputKey.K, InputKey.L, InputKey.Semicolon } : new[] { InputKey.J, InputKey.K, InputKey.L, InputKey.Semicolon };
-            int side = Math.Clamp(columns / 2, 0, left.Length);
-
-            var keys = new List<InputKey>(left.Skip(left.Length - side));
-            if (columns % 2 == 1)
-                keys.Add(InputKey.Space);
-            keys.AddRange(right.Take(side));
-
-            return keys.ToArray();
-        }
-
-        /// <summary>
-        /// The colour for a column of a stage with <paramref name="columns"/> keys: the colour of the key it's played with.
-        /// </summary>
-        public static Color4 ColourFor(int column, int columns)
-        {
-            var keys = DefaultKeysFor(columns);
-            return column >= 0 && column < keys.Length ? KEY_COLOURS[keys[column]] : Color4.White;
-        }
+        public static Color4 ColourFor(int column, int columns) => COLUMN_COLOURS[((column % COLUMN_COLOURS.Length) + COLUMN_COLOURS.Length) % COLUMN_COLOURS.Length];
 
         private readonly Dictionary<int, Color4> columnColours = new Dictionary<int, Color4>();
 

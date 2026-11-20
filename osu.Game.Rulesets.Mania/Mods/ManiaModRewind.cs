@@ -25,10 +25,20 @@ namespace osu.Game.Rulesets.Mania.Mods
 
         protected override bool CountStrayPresses => RewindOnStrayPresses.Value;
 
-        [SettingSource("Rewind on held keys", "Holding a key more than 0.1 s after a normal note, or letting go of a long note more than 0.1 s late, counts as a miss.")]
+        [SettingSource("Rewind on held keys", "Holding a key too long after a normal note, or letting go of a long note more than 0.1 s late, counts as a miss.")]
         public BindableBool RewindOnHeldKeys { get; } = new BindableBool(true);
 
+        [SettingSource("Normal note hold limit", "How many seconds a key may stay down after a normal note before it counts as a miss.")]
+        public BindableDouble NormalNoteHoldSeconds { get; } = new BindableDouble(0.3)
+        {
+            MinValue = 0.1,
+            MaxValue = 1,
+            Precision = 0.05,
+        };
+
         protected override bool CountHeldKeys => RewindOnHeldKeys.Value;
+
+        protected override double NormalNoteHoldLimit => NormalNoteHoldSeconds.Value * 1000;
 
         protected override int? LaneOf(ManiaAction action, DrawableRuleset<ManiaHitObject> drawableRuleset)
             => ((ManiaPlayfield)drawableRuleset.Playfield).Stages.SelectMany(s => s.Columns).FirstOrDefault(c => c.Action.Value == action)?.Index;

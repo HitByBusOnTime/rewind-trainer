@@ -5,8 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics.Colour;
-using osu.Framework.Input.Bindings;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mania.Mods;
@@ -40,31 +40,17 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
         }
 
         [Test]
-        public void TestKeysMatchTheGamesDefaultBindings()
+        public void TestAColumnKeepsItsColourAtEveryKeyCount()
         {
             for (int keys = 1; keys <= ManiaRuleset.MAX_STAGE_KEYS; keys++)
             {
-                var expected = new ManiaRuleset().GetDefaultKeyBindings(keys).Where(b => b.KeyCombination.Keys.First() != InputKey.None)
-                                                 .Select(b => b.KeyCombination.Keys.First()).ToArray();
-                Assert.That(ManiaModColumnColours.DefaultKeysFor(keys), Is.EqualTo(expected), $"{keys} keys");
+                for (int column = 0; column < keys; column++)
+                    Assert.That(ManiaModColumnColours.ColourFor(column, keys), Is.EqualTo(ManiaModColumnColours.COLUMN_COLOURS[column]), $"column {column + 1} of {keys}");
             }
-        }
 
-        [Test]
-        public void TestAKeyKeepsItsColourAtEveryKeyCount()
-        {
-            Color4 colourOf(InputKey key) => ManiaModColumnColours.KEY_COLOURS[key];
-
-            // F, the left index finger, on 4K (D F J K), 5K (D F Space J K), 7K (S D F Space J K L) and 8K (A S D F J K L ;).
-            Assert.That(ManiaModColumnColours.ColourFor(1, 4), Is.EqualTo(colourOf(InputKey.F)));
-            Assert.That(ManiaModColumnColours.ColourFor(1, 5), Is.EqualTo(colourOf(InputKey.F)));
-            Assert.That(ManiaModColumnColours.ColourFor(2, 7), Is.EqualTo(colourOf(InputKey.F)));
-            Assert.That(ManiaModColumnColours.ColourFor(3, 8), Is.EqualTo(colourOf(InputKey.F)));
-
-            // The whole of 7K, and the middle key being the same on 5K and 7K.
-            Assert.That(Enumerable.Range(0, 7).Select(i => ManiaModColumnColours.ColourFor(i, 7)),
-                Is.EqualTo(new[] { InputKey.S, InputKey.D, InputKey.F, InputKey.Space, InputKey.J, InputKey.K, InputKey.L }.Select(colourOf)));
-            Assert.That(ManiaModColumnColours.ColourFor(2, 5), Is.EqualTo(ManiaModColumnColours.ColourFor(3, 7)));
+            // The first is red, whatever the key count.
+            Assert.That(ManiaModColumnColours.ColourFor(0, 4), Is.EqualTo(ManiaModColumnColours.ColourFor(0, 7)));
+            Assert.That(ManiaModColumnColours.ColourFor(0, 4), Is.EqualTo(Color4Extensions.FromHex("ff3b3b")));
         }
 
         private const int keys = 7;

@@ -273,6 +273,11 @@ namespace osu.Game.Rulesets.Mods
         protected virtual bool CountHeldKeys => false;
 
         /// <summary>
+        /// How long, in milliseconds, a key may stay down after the press for a normal note when <see cref="CountHeldKeys"/> is on.
+        /// </summary>
+        protected virtual double NormalNoteHoldLimit => 300;
+
+        /// <summary>
         /// The lane a key plays, so a press can be matched with what it hit. Null for keys that don't hit anything.
         /// </summary>
         protected virtual int? LaneOf(TAction action, DrawableRuleset<TObject> drawableRuleset) => null;
@@ -287,7 +292,7 @@ namespace osu.Game.Rulesets.Mods
             var overlay = new RewindOverlay<TObject, TAction>(drawableRuleset, ShouldRewind,
                 a => IgnoreDuringRewind(a), () => LetPressThrough(drawableRuleset), () => OnRewindSettled(drawableRuleset),
                 RewindSeconds.Value * 1000, AnimationSeconds.Value * 1000, HoldSeconds.Value * 1000,
-                a => LaneOf(a, drawableRuleset), LaneOf, CountStrayPresses, CountHeldKeys);
+                a => LaneOf(a, drawableRuleset), LaneOf, CountStrayPresses, CountHeldKeys, NormalNoteHoldLimit);
 
             drawableRuleset.Overlays.Add(overlay);
             drawableRuleset.NewResult += overlay.OnNewResult;
@@ -322,10 +327,9 @@ namespace osu.Game.Rulesets.Mods
         private readonly bool countHeldKeys;
 
         /// <summary>
-        /// How long a key may stay down after the press for a normal note. Deliberately strict: the player asked for it,
-        /// to train out holding taps too long (their taps measured about 0.15 s).
+        /// How long a key may stay down after the press for a normal note.
         /// </summary>
-        private const double held_key_allowance = 100;
+        private readonly double normalNoteHoldLimit;
 
         /// <summary>
         /// How far from a long note's start a press can be and still be the one that starts it.
@@ -373,7 +377,8 @@ namespace osu.Game.Rulesets.Mods
 
         public RewindOverlay(DrawableRuleset<TObject> drawableRuleset, Func<JudgementResult, bool> shouldRewind, Func<TAction, bool> ignoreDuringRewind,
                              Func<bool> letPressThrough, Action settled, double rewindBy, double animationLength, double holdLength,
-                             Func<TAction, int?> laneOfAction, Func<HitObject, int?> laneOfObject, bool countStrayPresses, bool countHeldKeys)
+                             Func<TAction, int?> laneOfAction, Func<HitObject, int?> laneOfObject, bool countStrayPresses, bool countHeldKeys,
+                             double normalNoteHoldLimit)
         {
             this.drawableRuleset = drawableRuleset;
             this.shouldRewind = shouldRewind;
@@ -387,6 +392,7 @@ namespace osu.Game.Rulesets.Mods
             this.laneOfObject = laneOfObject;
             this.countStrayPresses = countStrayPresses;
             this.countHeldKeys = countHeldKeys;
+            this.normalNoteHoldLimit = normalNoteHoldLimit;
 
             RelativeSizeAxes = Axes.Both;
 
@@ -611,7 +617,7 @@ namespace osu.Game.Rulesets.Mods
                     longNoteEnd = Math.Max(longNoteEnd ?? double.NegativeInfinity, hitObject.GetEndTime());
             }
 
-            return longNoteEnd + long_note_release_allowance ?? pressTime + held_key_allowance;
+            return longNoteEnd + long_note_release_allowance ?? pressTime + normalNoteHoldLimit;
         }
 
         protected override void Update()

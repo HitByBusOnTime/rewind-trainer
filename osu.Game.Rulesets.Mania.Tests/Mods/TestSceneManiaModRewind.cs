@@ -511,7 +511,11 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
         }
 
         [Test]
-        public void TestHoldingANoteTooLongRewinds() => heldKeyTest(true, new Note { StartTime = 1000 }, 3000, true, 50, 200);
+        public void TestHoldingANoteTooLongRewinds() => heldKeyTest(true, new Note { StartTime = 1000 }, 3000, true, 250, 400);
+
+        // Released before the 0.3 s limit, about as long as the player's longer taps.
+        [Test]
+        public void TestANormalHoldIsFine() => heldKeyTest(true, new Note { StartTime = 1000 }, 1220, false);
 
         // A quick tap is fine.
         [Test]
