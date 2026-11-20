@@ -25,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.Mods
 
         protected override bool CountStrayPresses => RewindOnStrayPresses.Value;
 
-        [SettingSource("Rewind on held keys", "Holding a key down when there's no long note to hold counts as a miss.")]
+        [SettingSource("Rewind on held keys", "Holding a key down when there's no long note to hold, or letting go of a long note more than 0.1 s late, counts as a miss.")]
         public BindableBool RewindOnHeldKeys { get; } = new BindableBool(true);
 
         protected override bool CountHeldKeys => RewindOnHeldKeys.Value;

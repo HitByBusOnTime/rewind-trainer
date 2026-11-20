@@ -322,14 +322,19 @@ namespace osu.Game.Rulesets.Mods
         private readonly bool countHeldKeys;
 
         /// <summary>
-        /// How much longer than it's needed a key may stay down: past the press for a normal note, past the end for a long one.
+        /// How long a key may stay down after the press for a normal note.
         /// </summary>
         private const double held_key_allowance = 400;
 
         /// <summary>
-        /// Keys held down since a press during play, by lane: when the press was, and until when it's needed.
+        /// How late a long note may be let go of. The game itself only misses its end at about twice this, and gives a lower judgement before that.
         /// </summary>
-        private readonly Dictionary<int, (double pressed, double neededUntil)> heldKeys = new Dictionary<int, (double pressed, double neededUntil)>();
+        private const double long_note_release_allowance = 100;
+
+        /// <summary>
+        /// Keys held down since a press during play, by lane: when the press was, and when the key has to be let go of by.
+        /// </summary>
+        private readonly Dictionary<int, (double pressed, double letGoBy)> heldKeys = new Dictionary<int, (double pressed, double letGoBy)>();
 
         /// <summary>
         /// How long before play resumes a press already counts. People time the note sitting on the line by the closing ring,
@@ -566,7 +571,7 @@ namespace osu.Game.Rulesets.Mods
                         pendingPress = (lane, time, frame);
 
                     if (countHeldKeys)
-                        heldKeys[lane] = (time, neededUntil(lane, time));
+                        heldKeys[lane] = (time, letGoBy(lane, time));
                 }
             }
 
@@ -586,20 +591,21 @@ namespace osu.Game.Rulesets.Mods
         }
 
         /// <summary>
-        /// Until when a key pressed at this time is needed: to the end of a long note in its lane that the press could start, otherwise only the press itself.
+        /// When a key pressed at this time has to be let go of by: just after the end of a long note in its lane that the press could start,
+        /// otherwise a little after the press.
         /// </summary>
-        private double neededUntil(int lane, double pressTime)
+        private double letGoBy(int lane, double pressTime)
         {
-            double until = pressTime;
+            double? longNoteEnd = null;
 
             foreach (var hitObject in drawableRuleset.Objects)
             {
                 if (hitObject.GetEndTime() > hitObject.StartTime && laneOfObject(hitObject) == lane
                                                                  && Math.Abs(hitObject.StartTime - pressTime) <= held_key_allowance)
-                    until = Math.Max(until, hitObject.GetEndTime());
+                    longNoteEnd = Math.Max(longNoteEnd ?? double.NegativeInfinity, hitObject.GetEndTime());
             }
 
-            return until;
+            return longNoteEnd + long_note_release_allowance ?? pressTime + held_key_allowance;
         }
 
         protected override void Update()
@@ -627,7 +633,7 @@ namespace osu.Game.Rulesets.Mods
 
                 foreach (var (_, held) in heldKeys)
                 {
-                    if (now > held.neededUntil + held_key_allowance && duringPlay(now))
+                    if (now > held.letGoBy && duringPlay(now))
                     {
                         heldKeys.Clear();
                         rewindFor(held.pressed);
