@@ -38,6 +38,7 @@ namespace osu.Game.Screens.Select
         private StarCounter starCounter = null!;
         private ConstrainedIconContainer difficultyIcon = null!;
         private OsuSpriteText variantText = null!;
+        private YourMapBadge yourMapBadge = null!;
         private StarRatingDisplay starRatingDisplay = null!;
         private PanelLocalRankDisplay localRank = null!;
         private OsuSpriteText difficultyText = null!;
@@ -141,6 +142,12 @@ namespace osu.Game.Screens.Select
                                     Padding = new MarginPadding { Bottom = 4 },
                                     Children = new Drawable[]
                                     {
+                                        yourMapBadge = new YourMapBadge
+                                        {
+                                            Anchor = Anchor.BottomLeft,
+                                            Origin = Anchor.BottomLeft,
+                                            Margin = new MarginPadding { Right = 4f },
+                                        },
                                         variantText = new OsuSpriteText
                                         {
                                             Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
@@ -208,6 +215,7 @@ namespace osu.Game.Screens.Select
 
             localRank.Beatmap = beatmap;
             difficultyText.Text = beatmap.DifficultyName;
+            yourMapBadge.Kind = YourMapBadge.KindOf(beatmap);
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
             computeStarRating();

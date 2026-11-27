@@ -59,6 +59,7 @@ namespace osu.Game.Screens.Select
         private OsuSpriteText artistText = null!;
         private PanelUpdateBeatmapButton updateButton = null!;
         private BeatmapSetOnlineStatusPill statusPill = null!;
+        private YourMapBadge yourMapBadge = null!;
 
         private ConstrainedIconContainer difficultyIcon = null!;
         private StarRatingDisplay starRatingDisplay = null!;
@@ -147,6 +148,12 @@ namespace osu.Game.Screens.Select
                                             TextSize = OsuFont.Style.Caption2.Size,
                                             Margin = new MarginPadding { Right = 4f },
                                         },
+                                        yourMapBadge = new YourMapBadge
+                                        {
+                                            Anchor = Anchor.BottomLeft,
+                                            Origin = Anchor.BottomLeft,
+                                            Margin = new MarginPadding { Right = 4f },
+                                        },
                                         updateButton = new PanelUpdateBeatmapButton
                                         {
                                             Scale = new Vector2(0.8f),
@@ -230,6 +237,7 @@ namespace osu.Game.Screens.Select
             artistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
             updateButton.BeatmapSet = beatmapSet;
             statusPill.Status = beatmap.Status;
+            yourMapBadge.Kind = YourMapBadge.KindOf(beatmap);
 
             difficultyIcon.Icon = beatmap.Ruleset.CreateInstance().CreateIcon();
             difficultyIcon.Show();

@@ -5,6 +5,7 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Graphics.Carousel;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
 using osuTK;
@@ -24,6 +25,81 @@ namespace osu.Game.Tests.Visual.SongSelect
 
             AddBeatmaps(10, 3);
             WaitForDrawablePanels();
+        }
+
+        [Test]
+        public void TestYourMapsAreMarked()
+        {
+            // Only what's on screen gets drawn, so keep the list short.
+            RemoveAllBeatmaps();
+
+            AddStep("add a set with a difficulty of your own, and a plain set", () =>
+            {
+                var set = CreateTestBeatmapSetInfo(3, false);
+                set.Beatmaps[0].OnlineID = -1;
+                set.Beatmaps[0].DifficultyName = "practic";
+                BeatmapSets.Add(set);
+                BeatmapSets.Add(CreateTestBeatmapSetInfo(2, false));
+            });
+
+            // One folder is open at a time, so open the one holding your difficulty.
+            AddUntilStep("open the folder with your difficulty", () =>
+            {
+                var group = Carousel.GetCarouselItems()?.Select(i => i.Model).OfType<GroupedBeatmap>().FirstOrDefault(b => b.Beatmap.OnlineID == -1)?.Group;
+                var panel = Carousel.ChildrenOfType<PanelGroupStarDifficulty>().FirstOrDefault(p => p.Item?.Model is GroupDefinition g && g.Equals(group));
+
+                if (panel == null)
+                    return false;
+
+                if (!group!.Equals(Carousel.OpenGroup))
+                    panel.TriggerClick();
+
+                return true;
+            });
+
+            AddUntilStep("your difficulty says YOUR MAP and the official ones say HAS YOUR MAP", () =>
+            {
+                var panels = Carousel.ChildrenOfType<PanelBeatmapStandalone>().Where(p => p.Item != null).ToList();
+                var mine = panels.Where(p => ((GroupedBeatmap)p.Item!.Model).Beatmap.OnlineID == -1).ToList();
+                var siblings = panels.Where(p => ((GroupedBeatmap)p.Item!.Model).Beatmap.BeatmapSet!.Beatmaps.Any(b => b.OnlineID == -1)
+                                                 && ((GroupedBeatmap)p.Item!.Model).Beatmap.OnlineID != -1).ToList();
+
+                return mine.Count > 0 && mine.All(p => p.ChildrenOfType<YourMapBadge>().Single().Kind == YourMapBadge.BadgeKind.YourMap)
+                                      && siblings.All(p => p.ChildrenOfType<YourMapBadge>().Single().Kind == YourMapBadge.BadgeKind.HasYourMap)
+                                      && panels.Except(mine).Except(siblings).All(p => p.ChildrenOfType<YourMapBadge>().Single().Kind == YourMapBadge.BadgeKind.None);
+            });
+        }
+
+        [Test]
+        public void TestNavigatorJumpsBetweenStarFolders()
+        {
+            GroupNavigator navigator = null!;
+            GroupDefinition[] groups = null!;
+
+            AddStep("add the folder bar", () => Add(navigator = new GroupNavigator(Carousel)));
+            AddUntilStep("there are several star folders", () => (groups = Carousel.GetGroups().ToArray()).Length, () => Is.GreaterThanOrEqualTo(3));
+
+            AddUntilStep("the bar says no folder is open, and offers the first", () =>
+            {
+                navigator.Refresh();
+                return navigator.CurrentText.ToString() == "No folder open" && navigator.NextText.ToString() == $"↓ {groups[0].Title}";
+            });
+
+            AddStep("click the folder below", () => navigator.ChildrenOfType<RoundedButton>().Last().TriggerClick());
+            AddUntilStep("the first folder is open", () => Carousel.OpenGroup, () => Is.EqualTo(groups[0]));
+
+            AddStep("click the folder below", () => navigator.ChildrenOfType<RoundedButton>().Last().TriggerClick());
+            AddUntilStep("the second folder is open", () => Carousel.OpenGroup, () => Is.EqualTo(groups[1]));
+            AddUntilStep("the bar shows the folders around it", () =>
+            {
+                navigator.Refresh();
+                return navigator.CurrentText.ToString() == groups[1].Title.ToString()
+                       && navigator.PreviousText.ToString() == $"↑ {groups[0].Title}"
+                       && navigator.NextText.ToString() == $"↓ {groups[2].Title}";
+            });
+
+            AddStep("click the folder above", () => navigator.ChildrenOfType<RoundedButton>().First().TriggerClick());
+            AddUntilStep("back to the first folder", () => Carousel.OpenGroup, () => Is.EqualTo(groups[0]));
         }
 
         [Test]

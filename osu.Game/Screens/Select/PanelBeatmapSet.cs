@@ -49,6 +49,7 @@ namespace osu.Game.Screens.Select
         private Drawable chevronIcon = null!;
         private PanelUpdateBeatmapButton updateButton = null!;
         private BeatmapSetOnlineStatusPill statusPill = null!;
+        private YourMapBadge yourMapBadge = null!;
         private SpreadDisplay spreadDisplay = null!;
 
         [Resolved]
@@ -147,6 +148,12 @@ namespace osu.Game.Screens.Select
                                     Margin = new MarginPadding { Right = 5f },
                                     Animated = false,
                                 },
+                                yourMapBadge = new YourMapBadge
+                                {
+                                    Origin = Anchor.CentreLeft,
+                                    Anchor = Anchor.CentreLeft,
+                                    Margin = new MarginPadding { Right = 5f },
+                                },
                                 updateButton = new PanelUpdateBeatmapButton
                                 {
                                     Anchor = Anchor.CentreLeft,
@@ -205,6 +212,7 @@ namespace osu.Game.Screens.Select
             artistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
             updateButton.BeatmapSet = beatmapSet;
             statusPill.Status = beatmapSet.Status;
+            yourMapBadge.Kind = YourMapBadge.KindOf(beatmapSet);
             spreadDisplay.BeatmapSet.Value = beatmapSet;
         }
 
