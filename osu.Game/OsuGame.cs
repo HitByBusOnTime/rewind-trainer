@@ -462,6 +462,9 @@ namespace osu.Game
 
             SelectedMods.BindValueChanged(modsChanged);
             Beatmap.BindValueChanged(beatmapChanged, true);
+
+            // Brings back the mods picked last time, and keeps saving them.
+            Add(new SelectedModsMemory());
             configUserActivity.BindValueChanged(_ => updateWindowTitle());
 
             applySafeAreaConsiderations = LocalConfig.GetBindable<bool>(OsuSetting.SafeAreaConsiderations);
