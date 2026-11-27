@@ -309,6 +309,17 @@ namespace osu.Game.Screens.Select
 
         protected GroupDefinition? ExpandedGroup { get; private set; }
 
+        /// <summary>
+        /// The group that's open, if any.
+        /// </summary>
+        public GroupDefinition? OpenGroup => ExpandedGroup;
+
+        /// <summary>
+        /// Every group, in the order they're shown. Empty when the list isn't grouped.
+        /// </summary>
+        public IReadOnlyList<GroupDefinition> GetGroups()
+            => GetCarouselItems()?.Select(i => i.Model).OfType<GroupDefinition>().ToList() ?? (IReadOnlyList<GroupDefinition>)Array.Empty<GroupDefinition>();
+
         protected GroupedBeatmapSet? ExpandedBeatmapSet { get; private set; }
 
         protected override bool ShouldActivateOnKeyboardSelection(CarouselItem item) =>

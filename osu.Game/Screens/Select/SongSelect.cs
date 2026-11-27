@@ -281,6 +281,7 @@ namespace osu.Game.Screens.Select
                                                                 RequestRecommendedSelection = requestRecommendedSelection,
                                                                 NewItemsPresented = newItemsPresented,
                                                             },
+                                                            new GroupNavigator(carousel),
                                                             noResultsPlaceholder = new NoResultsPlaceholder
                                                             {
                                                                 RequestClearFilterText = () => FilterControl.Search(string.Empty)

@@ -572,6 +572,11 @@ namespace osu.Game.Graphics.Carousel
             }
         }
 
+        /// <summary>
+        /// Opens the next (or with a negative <paramref name="direction"/>, the previous) group, as Shift+Right/Left do.
+        /// </summary>
+        public void TraverseGroups(int direction) => Scheduler.AddOnce(traverseFromKey, new TraversalOperation(TraversalType.Group, direction));
+
         private enum TraversalType
         {
             Keyboard,
