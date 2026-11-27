@@ -19,6 +19,11 @@ namespace osu.Game.Screens.Select
 
         private readonly Func<FilterCriteria> getCriteria;
 
+        /// <summary>
+        /// A map's star rating in the mode being played. A convert's differs from the one the map stores for its own mode.
+        /// </summary>
+        public Func<BeatmapInfo, double> GetStarRating { get; init; } = static b => b.StarRating;
+
         public BeatmapCarouselFilterSorting(Func<FilterCriteria> getCriteria)
         {
             this.getCriteria = getCriteria;
@@ -27,6 +32,7 @@ namespace osu.Game.Screens.Select
         public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken) => await Task.Run(() =>
         {
             var criteria = getCriteria();
+            var stars = GetStarRating;
 
             bool groupedSets = BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
 
@@ -40,17 +46,17 @@ namespace osu.Game.Screens.Select
                 if (groupedSets)
                 {
                     if (ab.BeatmapSet!.Equals(bb.BeatmapSet))
-                        return compareDifficulty(ab, bb, criteria.Sort);
+                        return compareDifficulty(ab, bb, stars);
 
                     // If we're grouping by sets, all fallback sorts need to be aggregates for the set.
-                    return compare(ab, bb, criteria.Sort, aggregate: true);
+                    return compare(ab, bb, criteria.Sort, aggregate: true, stars);
                 }
 
-                return compare(ab, bb, criteria.Sort, aggregate: false);
+                return compare(ab, bb, criteria.Sort, aggregate: false, stars);
             })).ToList();
         }, cancellationToken).ConfigureAwait(false);
 
-        private static int compare(BeatmapInfo a, BeatmapInfo b, SortMode sort, bool aggregate)
+        private static int compare(BeatmapInfo a, BeatmapInfo b, SortMode sort, bool aggregate, Func<BeatmapInfo, double> stars)
         {
             int comparison;
 
@@ -75,7 +81,7 @@ namespace osu.Game.Screens.Select
                     break;
 
                 case SortMode.Difficulty:
-                    comparison = a.StarRating.CompareTo(b.StarRating);
+                    comparison = stars(a).CompareTo(stars(b));
                     break;
 
                 case SortMode.DateAdded:
@@ -131,12 +137,12 @@ namespace osu.Game.Screens.Select
             return comparison;
         }
 
-        private static int compareDifficulty(BeatmapInfo a, BeatmapInfo b, SortMode sort)
+        private static int compareDifficulty(BeatmapInfo a, BeatmapInfo b, Func<BeatmapInfo, double> stars)
         {
             int comparison = a.Ruleset.CompareTo(b.Ruleset);
 
             if (comparison == 0)
-                comparison = a.StarRating.CompareTo(b.StarRating);
+                comparison = stars(a).CompareTo(stars(b));
 
             return comparison;
         }

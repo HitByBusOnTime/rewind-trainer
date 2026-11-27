@@ -1,11 +1,16 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Osu;
+using osu.Game.Tests.Resources;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
 using osuTK;
@@ -25,6 +30,42 @@ namespace osu.Game.Tests.Visual.SongSelect
 
             AddBeatmaps(10, 3);
             WaitForDrawablePanels();
+        }
+
+        [Test]
+        public void TestConvertsGoInFoldersByTheirStarsInTheModePlayed()
+        {
+            // Three osu! maps all rated 4.2 in osu!, but 1.5, 2.5 and 3.5 played as mania converts.
+            var converted = new Dictionary<string, double> { ["a"] = 1.5, ["b"] = 2.5, ["c"] = 3.5 };
+
+            RemoveAllBeatmaps();
+
+            AddStep("work out converts' stars with known answers", () =>
+                Carousel.ComputeConvertedStars = (beatmap, _, _) => Task.FromResult<double?>(converted.TryGetValue(beatmap.DifficultyName, out double stars) ? stars : null));
+
+            AddStep("add three osu! maps rated 4.2", () =>
+            {
+                var set = TestResources.CreateTestBeatmapSetInfo(3, new[] { new OsuRuleset().RulesetInfo });
+                string[] names = { "a", "b", "c" };
+
+                for (int i = 0; i < 3; i++)
+                {
+                    set.Beatmaps[i].StarRating = 4.2;
+                    set.Beatmaps[i].DifficultyName = names[i];
+                }
+
+                BeatmapSets.Add(set);
+            });
+
+            ApplyToFilterAndWaitForFilter("play mania with converts", c =>
+            {
+                c.Ruleset = new ManiaRuleset().RulesetInfo;
+                c.AllowConvertedBeatmaps = true;
+            });
+
+            AddUntilStep("they're in the 1, 2 and 3 star folders, not all in 4", () =>
+                    Carousel.GetGroups().OfType<StarDifficultyGroupDefinition>().Select(g => g.Order).ToArray(),
+                () => Is.EqualTo(new[] { 1, 2, 3 }));
         }
 
         [Test]

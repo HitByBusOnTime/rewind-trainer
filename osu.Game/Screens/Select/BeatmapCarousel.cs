@@ -19,6 +19,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
 using osu.Framework.Localisation;
+using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
@@ -103,10 +104,11 @@ namespace osu.Game.Screens.Select
             Filters = new ICarouselFilter[]
             {
                 new BeatmapCarouselFilterMatching(() => Criteria!),
-                new BeatmapCarouselFilterSorting(() => Criteria!),
+                new BeatmapCarouselFilterSorting(() => Criteria!) { GetStarRating = starRatingFor },
                 grouping = new BeatmapCarouselFilterGrouping
                 {
                     GetCriteria = () => Criteria!,
+                    GetStarRating = starRatingFor,
                     GetCollections = GetAllCollections,
                     GetLocalUserTopRanks = GetBeatmapInfoGuidToTopRankMapping,
                     GetFavouriteBeatmapSets = GetFavouriteBeatmapSets,
@@ -796,11 +798,124 @@ namespace osu.Game.Screens.Select
 
         private ScheduledDelegate? loadingDebounce;
 
+        #region Converted star ratings
+
+        [Resolved(CanBeNull = true)]
+        private ConvertedStarRatings? sharedConvertedStars { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private BeatmapDifficultyCache? difficultyCache { get; set; }
+
+        private readonly ConvertedStarRatings localConvertedStars = new ConvertedStarRatings(null);
+
+        private ConvertedStarRatings convertedStars => sharedConvertedStars ?? localConvertedStars;
+
+        /// <summary>
+        /// How a convert's star rating in a mode is worked out. Replaceable for tests; by default it's the game's difficulty calculation.
+        /// </summary>
+        public Func<BeatmapInfo, RulesetInfo, CancellationToken, Task<double?>>? ComputeConvertedStars { get; set; }
+
+        private CancellationTokenSource? convertedStarsCancellation;
+        private string? convertedStarsRunningFor;
+
+        /// <summary>
+        /// A map's star rating in the mode being played, so converts go into star folders and sort by the rating shown on them,
+        /// not by their own mode's. Until a convert's rating has been worked out, its own mode's is used.
+        /// </summary>
+        private double starRatingFor(BeatmapInfo beatmap) => convertedStars.Get(beatmap, Criteria?.Ruleset) ?? beatmap.StarRating;
+
+        /// <summary>
+        /// Works out the ratings of converts in this mode that aren't known yet, in the background, then sorts the list again.
+        /// The first time can take a while with many maps; after that they're saved.
+        /// </summary>
+        private void fillConvertedStars(FilterCriteria criteria)
+        {
+            var ruleset = criteria.Ruleset;
+
+            if (ruleset == null || !criteria.AllowConvertedBeatmaps || convertedStarsRunningFor == ruleset.ShortName)
+                return;
+
+            var store = convertedStars;
+            var missing = detachedBeatmaps.SelectMany(s => s.Beatmaps)
+                                          .Where(b => !b.Hidden && b.Ruleset.ShortName != ruleset.ShortName && b.AllowGameplayWithRuleset(ruleset, true)
+                                                      && store.Get(b, ruleset) == null)
+                                          .ToList();
+
+            if (missing.Count == 0)
+                return;
+
+            convertedStarsCancellation?.Cancel();
+            var cancellation = convertedStarsCancellation = new CancellationTokenSource();
+            var compute = ComputeConvertedStars ?? computeWithDifficultyCache;
+
+            convertedStarsRunningFor = ruleset.ShortName;
+            Logger.Log($"Working out {missing.Count} converted star ratings for {ruleset.ShortName}");
+
+            Task.Run(async () =>
+            {
+                int found = 0;
+
+                try
+                {
+                    foreach (var beatmap in missing)
+                    {
+                        if (cancellation.IsCancellationRequested)
+                            return;
+
+                        try
+                        {
+                            double? value = await compute(beatmap, ruleset, cancellation.Token).ConfigureAwait(false);
+
+                            if (value != null)
+                            {
+                                store.Set(beatmap, ruleset, value.Value);
+                                found++;
+                            }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            return;
+                        }
+                        catch (Exception e)
+                        {
+                            Logger.Log($"Couldn't work out the {ruleset.ShortName} star rating of {beatmap}: {e.Message}");
+                        }
+                    }
+                }
+                finally
+                {
+                    if (found > 0)
+                        store.Save();
+
+                    Schedule(() =>
+                    {
+                        if (convertedStarsRunningFor == ruleset.ShortName)
+                            convertedStarsRunningFor = null;
+
+                        if (found > 0 && Criteria?.Ruleset?.ShortName == ruleset.ShortName)
+                            FilterAsync();
+                    });
+                }
+            }, cancellation.Token);
+        }
+
+        private async Task<double?> computeWithDifficultyCache(BeatmapInfo beatmap, RulesetInfo ruleset, CancellationToken cancellationToken)
+        {
+            if (difficultyCache == null)
+                return null;
+
+            var difficulty = await difficultyCache.GetDifficultyAsync(beatmap, ruleset, null, cancellationToken).ConfigureAwait(false);
+            return difficulty?.Stars;
+        }
+
+        #endregion
+
         public void Filter(FilterCriteria criteria, bool showLoadingImmediately = false)
         {
             bool resetDisplay = grouping.BeatmapSetsGroupedTogether != BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
 
             Criteria = criteria;
+            fillConvertedStars(criteria);
 
             loadingDebounce ??= Scheduler.AddDelayed(() =>
             {
