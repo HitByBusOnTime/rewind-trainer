@@ -7,6 +7,7 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
+using osu.Framework.Logging;
 using osu.Framework.Testing;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Judgements;
@@ -90,7 +91,14 @@ namespace osu.Game.Rulesets.Mania.Mods
                 last = Math.Max(last, memberResult.TimeAbsolute);
             }
 
-            return last - first > ChordLimitMilliseconds.Value * (release ? TailNote.RELEASE_WINDOW_LENIENCE : 1);
+            double limit = ChordLimitMilliseconds.Value * (release ? TailNote.RELEASE_WINDOW_LENIENCE : 1);
+
+            if (last - first <= limit)
+                return false;
+
+            Logger.Log($"[rewind] {(release ? "long notes let go of" : "chord pressed")} {last - first:N0} ms apart (limit {limit:N0}) at {note.StartTime:N0}: "
+                       + string.Join(", ", chord.Select(m => $"column {((ManiaHitObject)m).Column + 1} at {chordResults[m].TimeAbsolute:N0}")));
+            return true;
         }
 
         private static long chordKey(double time) => (long)Math.Round(time);

@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
+using osu.Framework.Logging;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
 using osu.Game.Configuration;
@@ -483,10 +484,15 @@ namespace osu.Game.Rulesets.Mods
             if (!shouldRewind(result))
                 return;
 
-            rewindFor(result.HitObject.StartTime);
+            rewindFor(result.HitObject.StartTime, $"{result.Type} on {describe(result.HitObject)}, judged at {result.TimeAbsolute:N0} ({result.TimeOffset:+0;-0;0} ms)");
         }
 
-        private void rewindFor(double missedTime)
+        private string describe(HitObject hitObject)
+            => $"{hitObject.GetType().Name} at {hitObject.StartTime:N0}" + (laneOfObject(hitObject) is int lane ? $" in column {lane + 1}" : string.Empty);
+
+        /// <param name="missedTime">The time of what was missed.</param>
+        /// <param name="reason">Why, written to the game's log so a rewind in play can be explained afterwards.</param>
+        private void rewindFor(double missedTime, string reason)
         {
             fromTime = gameplayClock.CurrentTime;
             toTime = Math.Max(ModRewind.GetRewindTarget(drawableRuleset.Objects, Math.Min(missedTime, fromTime), rewindBy, landings), gameplayClock.StartTime);
@@ -495,6 +501,7 @@ namespace osu.Game.Rulesets.Mods
                 return;
 
             landings.Add(toTime);
+            Logger.Log($"[rewind] {fromTime:N0} -> {toTime:N0}: {reason}");
             beginRewind();
         }
 
@@ -639,7 +646,7 @@ namespace osu.Game.Rulesets.Mods
                 pendingPress = null;
 
                 if (phase == Phase.Idle)
-                    rewindFor(press.time);
+                    rewindFor(press.time, $"stray press in column {press.lane + 1} at {press.time:N0}");
             }
 
             // A pause may end with a key let go of where gameplay doesn't see it, so start afresh after one.
@@ -650,12 +657,12 @@ namespace osu.Game.Rulesets.Mods
             {
                 double now = drawableRuleset.FrameStableClock.CurrentTime;
 
-                foreach (var (_, held) in heldKeys)
+                foreach (var (lane, held) in heldKeys)
                 {
                     if (now > held.letGoBy && duringPlay(now))
                     {
                         heldKeys.Clear();
-                        rewindFor(held.pressed);
+                        rewindFor(held.pressed, $"key in column {lane + 1} pressed at {held.pressed:N0} still down past {held.letGoBy:N0}");
                         break;
                     }
                 }
