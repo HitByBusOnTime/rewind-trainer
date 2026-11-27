@@ -287,8 +287,15 @@ namespace osu.Game.Rulesets.Mods
         /// </summary>
         protected virtual int? LaneOf(HitObject hitObject) => null;
 
+        /// <summary>
+        /// The ruleset this mod was applied to, for rules that need to look at the whole map.
+        /// </summary>
+        protected DrawableRuleset<TObject>? AppliedRuleset { get; private set; }
+
         public void ApplyToDrawableRuleset(DrawableRuleset<TObject> drawableRuleset)
         {
+            AppliedRuleset = drawableRuleset;
+
             var overlay = new RewindOverlay<TObject, TAction>(drawableRuleset, ShouldRewind,
                 a => IgnoreDuringRewind(a), () => LetPressThrough(drawableRuleset), () => OnRewindSettled(drawableRuleset),
                 RewindSeconds.Value * 1000, AnimationSeconds.Value * 1000, HoldSeconds.Value * 1000,

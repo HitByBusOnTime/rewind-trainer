@@ -12,6 +12,6 @@ namespace osu.Game.Rulesets.Mania.Mods
         public override string Acronym => "RW";
         public override LocalisableString Description => "Rewinds half a second before a miss.";
 
-        public override bool ShouldRewind(JudgementResult result) => HoldBroken(result) || IsMiss(result);
+        public override bool ShouldRewind(JudgementResult result) => HoldBroken(result) || IsMiss(result) || ChordSplit(result);
     }
 }

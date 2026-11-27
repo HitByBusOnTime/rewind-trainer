@@ -535,6 +535,133 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
         [Test]
         public void TestLettingGoOfALongNoteSlightlyLateIsFine() => heldKeyTest(true, new HoldNote { StartTime = 1000, Duration = 1000 }, 2030, false);
 
+        /// <summary>
+        /// Plays a two-note chord at 1 s (two long notes ending at 2 s when <paramref name="longNotes"/>), pressing the two keys
+        /// <paramref name="pressGap"/> ms apart and letting go of long notes <paramref name="releaseGap"/> ms apart, centred on the note.
+        /// </summary>
+        private void chordTest(bool enabled, bool longNotes, double pressGap, double releaseGap, bool expectRewind)
+        {
+            Key[] keys = new Key[2];
+            bool[] pressed = new bool[2], released = new bool[2];
+            double[] pressedAt = new double[2], releasedAt = new double[2];
+            bool rewound = false;
+            double furthest = double.NegativeInfinity, furthestAtRewind = 0;
+            ScheduledDelegate? player = null;
+
+            CreateModTest(new ModTestData
+            {
+                // Slowed down so frames are close together in song time.
+                Mods = new Mod[] { new ManiaModRewindOnMiss { RewindOnSplitChords = { Value = enabled } }, new ManiaModHalfTime { SpeedChange = { Value = 0.5 } } },
+                Autoplay = false,
+                CreateBeatmap = () => new Beatmap
+                {
+                    // The widest hit windows, so each note on its own is still a hit when the presses are far apart.
+                    Difficulty = new BeatmapDifficulty { OverallDifficulty = 0 },
+                    HitObjects = new List<HitObject>
+                    {
+                        longNotes ? new HoldNote { StartTime = 1000, Duration = 1000, Column = 0 } : new Note { StartTime = 1000, Column = 0 },
+                        longNotes ? new HoldNote { StartTime = 1000, Duration = 1000, Column = 1 } : new Note { StartTime = 1000, Column = 1 },
+                        new Note { StartTime = 5000, Column = 0 },
+                    },
+                },
+                // The steps below run before this is checked.
+                PassCondition = () => true,
+            });
+
+            AddStep("find the keys for the two columns", () =>
+            {
+                int columns = ((ManiaPlayfield)Player.DrawableRuleset.Playfield).TotalColumns;
+                var bindings = new ManiaRuleset().GetDefaultKeyBindings(columns).ToList();
+                keys[0] = (Key)bindings.First(b => b.GetAction<ManiaAction>() == ManiaAction.Key1).KeyCombination.Keys.First();
+                keys[1] = (Key)bindings.First(b => b.GetAction<ManiaAction>() == ManiaAction.Key2).KeyCombination.Keys.First();
+            });
+
+            AddStep("play", () => player = Scheduler.AddDelayed(() =>
+            {
+                if (Player?.GameplayClockContainer == null || !Player.IsLoaded || rewound)
+                    return;
+
+                double t = Player.DrawableRuleset.FrameStableClock.CurrentTime;
+
+                for (int i = 0; i < 2; i++)
+                {
+                    double pressAt = 1000 + (i == 0 ? -pressGap / 2 : pressGap / 2);
+                    double releaseAt = longNotes ? 2000 + (i == 0 ? -releaseGap / 2 : releaseGap / 2) : pressAt + 30;
+
+                    if (!pressed[i] && Player.GameplayClockContainer.IsRunning && t >= pressAt)
+                    {
+                        pressed[i] = true;
+                        pressedAt[i] = t;
+                        InputManager.PressKey(keys[i]);
+                    }
+                    else if (pressed[i] && !released[i] && t >= releaseAt)
+                    {
+                        released[i] = true;
+                        releasedAt[i] = t;
+                        InputManager.ReleaseKey(keys[i]);
+                    }
+                }
+
+                furthest = Math.Max(furthest, t);
+
+                if (t < furthest - 50)
+                {
+                    rewound = true;
+                    furthestAtRewind = furthest;
+                }
+            }, 0, true));
+
+            AddUntilStep("played the chord", () => rewound || Player.DrawableRuleset.FrameStableClock.CurrentTime > (longNotes ? 2500 : 1500));
+
+            if (expectRewind)
+            {
+                AddUntilStep("rewound", () => rewound);
+                AddAssert("for the chord", () =>
+                {
+                    TestContext.Progress.WriteLine($"CHORD pressed {pressedAt[0]:N0}/{pressedAt[1]:N0}, let go {releasedAt[0]:N0}/{releasedAt[1]:N0}, rewound at {furthestAtRewind:N0}");
+                    double end = longNotes && releaseGap > 0 ? 2000 : 1000;
+                    return furthestAtRewind > end && furthestAtRewind < end + 300;
+                });
+            }
+            else
+            {
+                AddUntilStep("played on", () => rewound || Player.DrawableRuleset.FrameStableClock.CurrentTime > 3000);
+                AddAssert("never rewound", () =>
+                {
+                    TestContext.Progress.WriteLine($"CHORD pressed {pressedAt[0]:N0}/{pressedAt[1]:N0}, let go {releasedAt[0]:N0}/{releasedAt[1]:N0}, rewound: {rewound}");
+                    return !rewound;
+                });
+            }
+
+            AddStep("let go", () =>
+            {
+                player?.Cancel();
+                InputManager.ReleaseKey(keys[0]);
+                InputManager.ReleaseKey(keys[1]);
+            });
+        }
+
+        [Test]
+        public void TestPressingAChordTogetherIsFine() => chordTest(true, false, 0, 0, false);
+
+        [Test]
+        public void TestSplittingAChordRewinds() => chordTest(true, false, 100, 0, true);
+
+        [Test]
+        public void TestSplitChordsCanBeTurnedOff() => chordTest(false, false, 100, 0, false);
+
+        [Test]
+        public void TestPressingLongNotesApartRewinds() => chordTest(true, true, 100, 0, true);
+
+        [Test]
+        public void TestLongNotesTogetherAreFine() => chordTest(true, true, 0, 0, false);
+
+        [Test]
+        public void TestLettingGoOfLongNotesApartRewinds() => chordTest(true, true, 0, 130, true);
+
+        [Test]
+        public void TestLettingGoOfLongNotesApartCanBeTurnedOff() => chordTest(false, true, 0, 130, false);
+
         [Test]
         public void TestMissRewindsThenResumes() => createRewindTest(new ManiaModRewindOnMiss(), new Note { StartTime = 3000 }, true);
 
