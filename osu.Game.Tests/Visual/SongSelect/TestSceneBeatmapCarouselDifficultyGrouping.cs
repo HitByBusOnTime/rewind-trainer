@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Graphics.Carousel;
-using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Tests.Resources;
@@ -124,17 +123,17 @@ namespace osu.Game.Tests.Visual.SongSelect
             AddUntilStep("the bar shows, says no folder is open, and offers the first", () =>
                 navigator.Alpha > 0 && navigator.CurrentText.ToString() == "No folder open" && navigator.NextText.ToString() == $"↓ {groups[0].Title}");
 
-            AddStep("click the folder below", () => navigator.ChildrenOfType<RoundedButton>().Last().TriggerClick());
+            AddStep("click the folder below", () => navigator.Next.TriggerClick());
             AddUntilStep("the first folder is open", () => Carousel.OpenGroup, () => Is.EqualTo(groups[0]));
 
-            AddStep("click the folder below", () => navigator.ChildrenOfType<RoundedButton>().Last().TriggerClick());
+            AddStep("click the folder below", () => navigator.Next.TriggerClick());
             AddUntilStep("the second folder is open", () => Carousel.OpenGroup, () => Is.EqualTo(groups[1]));
             AddUntilStep("the bar shows the folders around it", () =>
                 navigator.CurrentText.ToString() == groups[1].Title.ToString()
                 && navigator.PreviousText.ToString() == $"↑ {groups[0].Title}"
                 && navigator.NextText.ToString() == $"↓ {groups[2].Title}");
 
-            AddStep("click the folder above", () => navigator.ChildrenOfType<RoundedButton>().First().TriggerClick());
+            AddStep("click the folder above", () => navigator.Previous.TriggerClick());
             AddUntilStep("back to the first folder", () => Carousel.OpenGroup, () => Is.EqualTo(groups[0]));
         }
 

@@ -12,7 +12,6 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Extensions;
-using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Models;
 using osu.Game.Online.API;
@@ -53,6 +52,23 @@ namespace osu.Game.Tests.Visual.SongSelect
 
             AddUntilStep("the folder bar shows on its own", () => SongSelect.ChildrenOfType<GroupNavigator>().Single().Alpha, () => Is.GreaterThan(0));
 
+            // The first version drew the buttons as two blocks covering the whole list.
+            AddUntilStep("small labels: the folder above and the open one at the top of the list, the one below at the bottom", () =>
+            {
+                var navigator = SongSelect.ChildrenOfType<GroupNavigator>().Single();
+                var list = Carousel.ScreenSpaceDrawQuad;
+                var current = navigator.Current.ScreenSpaceDrawQuad;
+                var above = navigator.Previous.ScreenSpaceDrawQuad;
+                var below = navigator.Next.ScreenSpaceDrawQuad;
+
+                bool small(osu.Framework.Graphics.Primitives.Quad q) => q.Height < 40 && q.Width < list.Width / 3;
+
+                return (navigator.Previous.Alpha > 0 || navigator.Next.Alpha > 0)
+                       && small(current) && current.Centre.Y < list.Centre.Y
+                       && (navigator.Previous.Alpha == 0 || (small(above) && above.Centre.Y < current.Centre.Y))
+                       && (navigator.Next.Alpha == 0 || (small(below) && below.Centre.Y > list.Centre.Y));
+            });
+
             // Song select opens on a map, so a folder is already open: go to the one below it, or above it when it's the last.
             string expected = string.Empty;
 
@@ -65,8 +81,8 @@ namespace osu.Game.Tests.Visual.SongSelect
 
                 expected = groups[last ? open - 1 : open + 1].Title.ToString();
 
-                var buttons = SongSelect.ChildrenOfType<GroupNavigator>().Single().ChildrenOfType<RoundedButton>();
-                (last ? buttons.First() : buttons.Last()).TriggerClick();
+                var navigator = SongSelect.ChildrenOfType<GroupNavigator>().Single();
+                (last ? navigator.Previous : navigator.Next).TriggerClick();
             });
             AddUntilStep("that folder is open and the bar says so", () => SongSelect.ChildrenOfType<GroupNavigator>().Single().CurrentText.ToString(), () => Is.EqualTo(expected));
             AddAssert("the song list agrees", () => Carousel.OpenGroup?.Title.ToString(), () => Is.EqualTo(expected));
