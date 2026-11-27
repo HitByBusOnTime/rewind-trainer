@@ -43,6 +43,9 @@ namespace osu.Game.Screens.Select
             RelativeSizeAxes = Axes.X;
             Height = HEIGHT;
             Alpha = 0;
+
+            // Starts hidden until it knows there are folders, and a hidden drawable isn't updated otherwise, so it would never show.
+            AlwaysPresent = true;
         }
 
         [BackgroundDependencyLoader]

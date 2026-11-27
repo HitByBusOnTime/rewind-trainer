@@ -12,6 +12,7 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Extensions;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Models;
 using osu.Game.Online.API;
@@ -33,6 +34,43 @@ namespace osu.Game.Tests.Visual.SongSelect
 
         [SetUp]
         public void SetUp() => Schedule(() => API.Logout());
+
+        [Test]
+        public void TestFolderBarShowsInSongSelect()
+        {
+            double[] stars = { 1.5, 2.5, 3.5 };
+
+            foreach (double star in stars)
+                ImportBeatmapForRuleset(set =>
+                {
+                    foreach (var beatmap in set.Beatmaps)
+                        beatmap.StarRating = star;
+                }, 2, 0);
+
+            LoadSongSelect();
+            SortAndGroupBy(SortMode.Difficulty, GroupMode.Difficulty);
+            WaitForFiltering();
+
+            AddUntilStep("the folder bar shows on its own", () => SongSelect.ChildrenOfType<GroupNavigator>().Single().Alpha, () => Is.GreaterThan(0));
+
+            // Song select opens on a map, so a folder is already open: go to the one below it, or above it when it's the last.
+            string expected = string.Empty;
+
+            AddUntilStep("a folder is open", () => Carousel.OpenGroup, () => Is.Not.Null);
+            AddStep("click the next folder", () =>
+            {
+                var groups = Carousel.GetGroups();
+                int open = groups.ToList().FindIndex(g => g.Equals(Carousel.OpenGroup));
+                bool last = open == groups.Count - 1;
+
+                expected = groups[last ? open - 1 : open + 1].Title.ToString();
+
+                var buttons = SongSelect.ChildrenOfType<GroupNavigator>().Single().ChildrenOfType<RoundedButton>();
+                (last ? buttons.First() : buttons.Last()).TriggerClick();
+            });
+            AddUntilStep("that folder is open and the bar says so", () => SongSelect.ChildrenOfType<GroupNavigator>().Single().CurrentText.ToString(), () => Is.EqualTo(expected));
+            AddAssert("the song list agrees", () => Carousel.OpenGroup?.Title.ToString(), () => Is.EqualTo(expected));
+        }
 
         #region Collection grouping
 

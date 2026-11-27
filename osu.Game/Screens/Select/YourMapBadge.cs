@@ -15,19 +15,14 @@ using osuTK.Graphics;
 namespace osu.Game.Screens.Select
 {
     /// <summary>
-    /// Marks the player's own maps in the song list: a difficulty they made (not an official one, like a copy they edited),
-    /// and the official ones it was made from, so it's easy to see which maps have a version of their own.
+    /// Marks the official maps the player has made a version of their own from (a difficulty that isn't from the website,
+    /// like a copy they edited, added to the same set). The player's own difficulties themselves aren't marked.
     /// </summary>
     public partial class YourMapBadge : CircularContainer
     {
         public enum BadgeKind
         {
             None,
-
-            /// <summary>
-            /// A difficulty the player made themselves.
-            /// </summary>
-            YourMap,
 
             /// <summary>
             /// An official difficulty, or a set, with a difficulty of the player's own alongside it.
@@ -43,7 +38,7 @@ namespace osu.Game.Screens.Select
         public static BadgeKind KindOf(BeatmapInfo beatmap)
         {
             if (IsYourOwn(beatmap))
-                return BadgeKind.YourMap;
+                return BadgeKind.None;
 
             return beatmap.BeatmapSet?.Beatmaps.Any(IsYourOwn) == true ? BadgeKind.HasYourMap : BadgeKind.None;
         }
@@ -99,13 +94,6 @@ namespace osu.Game.Screens.Select
         {
             switch (kind)
             {
-                case BadgeKind.YourMap:
-                    background.Colour = Color4Extensions.FromHex("ff4fb8");
-                    text.Colour = Color4.White;
-                    text.Text = "YOUR MAP";
-                    Alpha = 1;
-                    break;
-
                 case BadgeKind.HasYourMap:
                     background.Colour = Color4Extensions.FromHex("ffd60a");
                     text.Colour = Color4.Black;

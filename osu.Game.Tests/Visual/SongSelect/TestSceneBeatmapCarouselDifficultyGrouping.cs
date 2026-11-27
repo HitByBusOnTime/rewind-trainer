@@ -57,14 +57,14 @@ namespace osu.Game.Tests.Visual.SongSelect
                 return true;
             });
 
-            AddUntilStep("your difficulty says YOUR MAP and the official ones say HAS YOUR MAP", () =>
+            AddUntilStep("the official difficulties say HAS YOUR MAP and yours says nothing", () =>
             {
                 var panels = Carousel.ChildrenOfType<PanelBeatmapStandalone>().Where(p => p.Item != null).ToList();
                 var mine = panels.Where(p => ((GroupedBeatmap)p.Item!.Model).Beatmap.OnlineID == -1).ToList();
                 var siblings = panels.Where(p => ((GroupedBeatmap)p.Item!.Model).Beatmap.BeatmapSet!.Beatmaps.Any(b => b.OnlineID == -1)
                                                  && ((GroupedBeatmap)p.Item!.Model).Beatmap.OnlineID != -1).ToList();
 
-                return mine.Count > 0 && mine.All(p => p.ChildrenOfType<YourMapBadge>().Single().Kind == YourMapBadge.BadgeKind.YourMap)
+                return mine.Count > 0 && mine.All(p => p.ChildrenOfType<YourMapBadge>().Single().Kind == YourMapBadge.BadgeKind.None)
                                       && siblings.All(p => p.ChildrenOfType<YourMapBadge>().Single().Kind == YourMapBadge.BadgeKind.HasYourMap)
                                       && panels.Except(mine).Except(siblings).All(p => p.ChildrenOfType<YourMapBadge>().Single().Kind == YourMapBadge.BadgeKind.None);
             });
@@ -79,11 +79,9 @@ namespace osu.Game.Tests.Visual.SongSelect
             AddStep("add the folder bar", () => Add(navigator = new GroupNavigator(Carousel)));
             AddUntilStep("there are several star folders", () => (groups = Carousel.GetGroups().ToArray()).Length, () => Is.GreaterThanOrEqualTo(3));
 
-            AddUntilStep("the bar says no folder is open, and offers the first", () =>
-            {
-                navigator.Refresh();
-                return navigator.CurrentText.ToString() == "No folder open" && navigator.NextText.ToString() == $"↓ {groups[0].Title}";
-            });
+            // No manual refresh: the bar has to keep itself up to date.
+            AddUntilStep("the bar shows, says no folder is open, and offers the first", () =>
+                navigator.Alpha > 0 && navigator.CurrentText.ToString() == "No folder open" && navigator.NextText.ToString() == $"↓ {groups[0].Title}");
 
             AddStep("click the folder below", () => navigator.ChildrenOfType<RoundedButton>().Last().TriggerClick());
             AddUntilStep("the first folder is open", () => Carousel.OpenGroup, () => Is.EqualTo(groups[0]));
@@ -91,12 +89,9 @@ namespace osu.Game.Tests.Visual.SongSelect
             AddStep("click the folder below", () => navigator.ChildrenOfType<RoundedButton>().Last().TriggerClick());
             AddUntilStep("the second folder is open", () => Carousel.OpenGroup, () => Is.EqualTo(groups[1]));
             AddUntilStep("the bar shows the folders around it", () =>
-            {
-                navigator.Refresh();
-                return navigator.CurrentText.ToString() == groups[1].Title.ToString()
-                       && navigator.PreviousText.ToString() == $"↑ {groups[0].Title}"
-                       && navigator.NextText.ToString() == $"↓ {groups[2].Title}";
-            });
+                navigator.CurrentText.ToString() == groups[1].Title.ToString()
+                && navigator.PreviousText.ToString() == $"↑ {groups[0].Title}"
+                && navigator.NextText.ToString() == $"↓ {groups[2].Title}");
 
             AddStep("click the folder above", () => navigator.ChildrenOfType<RoundedButton>().First().TriggerClick());
             AddUntilStep("back to the first folder", () => Carousel.OpenGroup, () => Is.EqualTo(groups[0]));

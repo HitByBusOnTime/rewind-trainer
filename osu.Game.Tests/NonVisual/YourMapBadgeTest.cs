@@ -21,8 +21,9 @@ namespace osu.Game.Tests.NonVisual
             set.Beatmaps.Add(mine);
             set.Beatmaps.Add(alsoMine);
 
-            Assert.That(YourMapBadge.KindOf(mine), Is.EqualTo(YourMapBadge.BadgeKind.YourMap));
-            Assert.That(YourMapBadge.KindOf(alsoMine), Is.EqualTo(YourMapBadge.BadgeKind.YourMap));
+            // The player's own difficulties aren't marked, only the official ones they were made from.
+            Assert.That(YourMapBadge.KindOf(mine), Is.EqualTo(YourMapBadge.BadgeKind.None));
+            Assert.That(YourMapBadge.KindOf(alsoMine), Is.EqualTo(YourMapBadge.BadgeKind.None));
             Assert.That(YourMapBadge.KindOf(official), Is.EqualTo(YourMapBadge.BadgeKind.HasYourMap));
             Assert.That(YourMapBadge.KindOf(set), Is.EqualTo(YourMapBadge.BadgeKind.HasYourMap));
 
