@@ -30,7 +30,7 @@ Other things this build adds:
 
 - **Your mods are remembered.** The mods you pick, and their settings, are still selected the next time you open the game.
 - **Star folders you can jump between.** When the song list is grouped (for example by difficulty), a bar at the top shows the folder you're in, with buttons for the folders above and below it. Shift+Left and Shift+Right do the same.
-- **Your own maps are marked.** A difficulty you made yourself (not from the website, like an edited copy) shows **YOUR MAP**, and the official difficulties in the same set show **HAS YOUR MAP**.
+- **Maps you've made your own version of are marked.** When you've added a difficulty of your own to a map (not from the website, like an edited copy), its official difficulties and the set show **HAS YOUR MAP**.
 
 ## Install (Windows 64-bit)
 
