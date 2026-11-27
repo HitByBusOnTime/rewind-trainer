@@ -46,7 +46,7 @@ namespace osu.Game.Rulesets.Mania.Mods
         public BindableBool RewindOnSplitChords { get; } = new BindableBool(true);
 
         [SettingSource("Chord limit", "How many milliseconds apart the notes of a chord may be pressed. Long notes may be let go of 1.5 times as far apart, as the game allows for releases.")]
-        public BindableInt ChordLimitMilliseconds { get; } = new BindableInt(40)
+        public BindableInt ChordLimitMilliseconds { get; } = new BindableInt(60)
         {
             MinValue = 10,
             MaxValue = 150,

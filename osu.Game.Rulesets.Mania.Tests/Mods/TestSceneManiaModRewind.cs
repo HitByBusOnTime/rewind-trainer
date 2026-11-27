@@ -537,7 +537,9 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
 
         /// <summary>
         /// Plays a two-note chord at 1 s (two long notes ending at 2 s when <paramref name="longNotes"/>), pressing the two keys
-        /// <paramref name="pressGap"/> ms apart and letting go of long notes <paramref name="releaseGap"/> ms apart, centred on the note.
+        /// <paramref name="pressGap"/> ms apart and letting go of long notes <paramref name="releaseGap"/> ms apart, with a 30 ms chord limit.
+        /// The second key comes 30 ms late and the first one early by the rest of the gap: a frame can add up to about 40 ms to a press,
+        /// and at half speed every press has to stay inside the halved hit windows, and every release within the 0.1 s late-release rule.
         /// </summary>
         private void chordTest(bool enabled, bool longNotes, double pressGap, double releaseGap, bool expectRewind)
         {
@@ -551,7 +553,11 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
             CreateModTest(new ModTestData
             {
                 // Slowed down so frames are close together in song time.
-                Mods = new Mod[] { new ManiaModRewindOnMiss { RewindOnSplitChords = { Value = enabled } }, new ManiaModHalfTime { SpeedChange = { Value = 0.5 } } },
+                Mods = new Mod[]
+                {
+                    new ManiaModRewindOnMiss { RewindOnSplitChords = { Value = enabled }, ChordLimitMilliseconds = { Value = 30 } },
+                    new ManiaModHalfTime { SpeedChange = { Value = 0.5 } },
+                },
                 Autoplay = false,
                 CreateBeatmap = () => new Beatmap
                 {
@@ -585,8 +591,8 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
 
                 for (int i = 0; i < 2; i++)
                 {
-                    double pressAt = 1000 + (i == 0 ? -pressGap / 2 : pressGap / 2);
-                    double releaseAt = longNotes ? 2000 + (i == 0 ? -releaseGap / 2 : releaseGap / 2) : pressAt + 30;
+                    double pressAt = 1000 + (pressGap == 0 ? 0 : i == 0 ? 30 - pressGap : 30);
+                    double releaseAt = longNotes ? 2000 + (releaseGap == 0 ? 0 : i == 0 ? 30 - releaseGap : 30) : pressAt + 30;
 
                     if (!pressed[i] && Player.GameplayClockContainer.IsRunning && t >= pressAt)
                     {
@@ -645,22 +651,26 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
         public void TestPressingAChordTogetherIsFine() => chordTest(true, false, 0, 0, false);
 
         [Test]
-        public void TestSplittingAChordRewinds() => chordTest(true, false, 100, 0, true);
+        public void TestSplittingAChordRewinds() => chordTest(true, false, 80, 0, true);
 
         [Test]
-        public void TestSplitChordsCanBeTurnedOff() => chordTest(false, false, 100, 0, false);
+        public void TestSplitChordsCanBeTurnedOff() => chordTest(false, false, 80, 0, false);
 
         [Test]
-        public void TestPressingLongNotesApartRewinds() => chordTest(true, true, 100, 0, true);
+        public void TestPressingLongNotesApartRewinds() => chordTest(true, true, 80, 0, true);
 
         [Test]
         public void TestLongNotesTogetherAreFine() => chordTest(true, true, 0, 0, false);
 
         [Test]
-        public void TestLettingGoOfLongNotesApartRewinds() => chordTest(true, true, 0, 130, true);
+        public void TestLettingGoOfLongNotesApartRewinds() => chordTest(true, true, 0, 100, true);
 
         [Test]
-        public void TestLettingGoOfLongNotesApartCanBeTurnedOff() => chordTest(false, true, 0, 130, false);
+        public void TestLettingGoOfLongNotesApartCanBeTurnedOff() => chordTest(false, true, 0, 100, false);
+
+        // The player's rolled chords measured 50-70 ms apart; 60 ms halves the rewinds and still catches the clearly rolled ones.
+        [Test]
+        public void TestChordLimitIs60MillisecondsByDefault() => Assert.That(new ManiaModRewindOnMiss().ChordLimitMilliseconds.Value, Is.EqualTo(60));
 
         [Test]
         public void TestMissRewindsThenResumes() => createRewindTest(new ManiaModRewindOnMiss(), new Note { StartTime = 3000 }, true);
