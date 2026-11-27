@@ -26,6 +26,12 @@ The rewind distance, animation length and pause can be changed in each mod's set
 
 There's also **Column Colours (CC)** for osu!mania, in the Fun column of the mod menu. Every key gets its own colour, the same at any key count and with any skin or map skin: A red, S orange, D yellow, F green, Space white, J cyan, K blue, L purple, ; pink (by the game's default keys). With classic-style skins, notes are drawn as plain bars of that colour.
 
+Other things this build adds:
+
+- **Your mods are remembered.** The mods you pick, and their settings, are still selected the next time you open the game.
+- **Star folders you can jump between.** When the song list is grouped (for example by difficulty), a bar at the top shows the folder you're in, with buttons for the folders above and below it. Shift+Left and Shift+Right do the same.
+- **Your own maps are marked.** A difficulty you made yourself (not from the website, like an edited copy) shows **YOUR MAP**, and the official difficulties in the same set show **HAS YOUR MAP**.
+
 ## Install (Windows 64-bit)
 
 1. Download the game with the link at the top of this page and unzip it anywhere.
